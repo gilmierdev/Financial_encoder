@@ -1,5 +1,20 @@
 # Financial Encoder — Release Notes
 
+## v1.0.7 (September 17, 2026)
+
+### Updates
+
+- **Complete UI/UX refresh.** Every screen was redesigned with a modern indigo-to-violet
+  accent system, softer cards and shadows, a glassy top bar, animated navigation states,
+  refined tables, forms, buttons, badges and modals, plus a smoother page-to-page feel.
+  Light and dark themes were re-tuned for better contrast and readability.
+- **Faster, cleaner update checks.** Redundant background version checks are now deduped
+  (one request instead of several at startup), and the download banner keeps the target
+  version visible while progress streams.
+- **Better update-message handling.** Update errors are translated to clear, friendly
+  notices again (offline, connectivity, checksum, permissions, no-published-releases),
+  with full coverage restored for the update helpers.
+
 ## v1.0.6 (September 16, 2026)
 
 ### Updates
