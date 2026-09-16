@@ -1,173 +1,140 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../services/api'
 import type { UpdateStatus } from '../../../electron/types/ipc'
-import { Icon } from '../ui/Icon'
+import { api } from '../../services/api'
 
-function formatMegabytes(bytes: number): string {
-  const mb = bytes / (1024 * 1024)
-  return mb >= 100 ? mb.toFixed(0) : mb.toFixed(1)
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/**
- * Settings → Updates. A compact control panel for the update flow: current
- * version, check for updates, and download the newest installer into the user's
- * Downloads folder (which they then run themselves). The app never installs or
- * runs anything by itself.
- */
 function UpdatePanel(): React.JSX.Element {
-  const [currentVersion, setCurrentVersion] = useState<string>('')
-  const [status, setStatus] = useState<UpdateStatus | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<UpdateStatus>({ state: 'unsupported' })
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-    void api.app
-      .getInfo()
-      .then((info) => {
-        if (!cancelled) {
-          setCurrentVersion(info.version)
-        }
-      })
-      .catch(() => undefined)
-
-    const unsubscribe = api.updater.onStatus((next) => {
-      setBusy(false)
-      setStatus(next)
-    })
-
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
+    const unsub = api.updater.onStatus(setStatus)
+    return unsub
   }, [])
 
-  const available = status?.state === 'available'
-  const downloading = status?.state === 'setup-downloading'
-  const downloaded = status?.state === 'setup-downloaded'
+  useEffect(() => {
+    void api.updater.check().then(setStatus).catch(() => {})
+  }, [])
+
+  async function handleCheck(): Promise<void> {
+    setChecking(true)
+    try {
+      await api.updater.check().then(setStatus)
+    } catch {
+      // handled by onStatus
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  if (status.state === 'unsupported') {
+    return (
+      <section className="card">
+        <h2 className="card__title">Updates</h2>
+        <p className="chart-empty" style={{ margin: 0 }}>
+          Auto-update is only available in the installed production version.
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="card">
-      <div className="settings-card-head">
-        <div>
-          <h2 className="card__title">Updates</h2>
-          <p className="settings-card-head__desc">
-            Financial Encoder checks GitHub for new versions. When one is available you can
-            download the installer straight into your Downloads folder and run it yourself; the
-            app never updates itself without your action.
+      <h2 className="card__title">Updates</h2>
+
+      {status.state === 'checking' && (
+        <div className="update-panel__status">
+          <div className="spinner" aria-label="Checking for updates" />
+          <span>Checking for updates…</span>
+        </div>
+      )}
+
+      {status.state === 'not-available' && (
+        <>
+          <p style={{ margin: '0 0 8px' }}>
+            <span className="update-panel__version">Version {status.currentVersion}</span>
           </p>
-        </div>
-      </div>
+          <p style={{ margin: 0 }}>You're using the latest version.</p>
+        </>
+      )}
 
-      <div className="field">
-        <span className="field__label">Current version</span>
-        <span className="field__hint update-panel__version">
-          <Icon name="update" size={14} />
-          {currentVersion || '…'}
-        </span>
-      </div>
+      {status.state === 'available' && (
+        <>
+          <p style={{ margin: '0 0 4px' }}>
+            <span className="update-panel__version">Version {status.currentVersion}</span>
+          </p>
+          <p style={{ margin: '0 0 8px' }}>
+            <span className="update-panel__version" style={{ color: 'var(--accent)' }}>
+              New version {status.newVersion} is available.
+            </span>
+          </p>
+          <button type="button" className="btn btn--primary" onClick={() => void api.updater.download().then(setStatus)}>
+            Download update
+          </button>
+        </>
+      )}
 
-      {status && status.state !== 'unsupported' ? (
-        <div className="field">
-          <span className="field__label">Status</span>
-          <div className="update-panel__status">
-            {status.state === 'checking' && <span className="field__hint">Checking for updates&hellip;</span>}
-
-            {status.state === 'not-available' && (
-              <span className="field__hint">No update is currently available.</span>
-            )}
-
-            {status.state === 'check-failed' && (
-              <span className="field__hint update-panel__error">{status.message}</span>
-            )}
-
-            {status.state === 'error' && (
-              <span className="field__hint update-panel__error">{status.message}</span>
-            )}
-
-            {available && (
-              <span className="field__hint">
-                New version available: {status.newVersion} (you have {status.currentVersion})
-              </span>
-            )}
-
-            {downloading && (
-              <span className="field__hint">
-                Downloading setup&hellip; {Math.min(100, Math.max(0, status.percent))}% &middot;{' '}
-                {status.total > 0
-                  ? `${formatMegabytes(status.transferred)} of ${formatMegabytes(status.total)} MB`
-                  : `${formatMegabytes(status.transferred)} MB`}
-              </span>
-            )}
-
-            {downloaded && (
-              <span className="field__hint">
-                Setup {status.newVersion} downloaded to your Downloads folder — run it to update.
-              </span>
-            )}
+      {status.state === 'downloading' && (
+        <>
+          <p style={{ margin: '0 0 4px' }}>Downloading update…</p>
+          <div className="update-banner__progress" style={{ marginBottom: 8 }}>
+            <div className="update-banner__progress-bar" style={{ width: `${status.percent}%` }} />
           </div>
-        </div>
-      ) : (
-        <p className="field__hint">
-          Updates are available in the installed Windows application. In development mode the updater is disabled.
-        </p>
+          <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
+            {status.percent}%{status.total > 0 ? ` of ${formatBytes(status.total)}` : ''}
+          </p>
+        </>
       )}
 
-      {available ? (
-        <div className="field__row">
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={busy}
-            onClick={() => {
-              setBusy(true)
-              void api.updater.downloadSetup().then(setStatus).catch(() => undefined)
-            }}
-          >
-            {busy ? 'Starting…' : 'Download setup'}
+      {status.state === 'downloaded' && (
+        <>
+          <p style={{ margin: '0 0 8px' }}>
+            <span className="update-panel__version">
+              Financial Encoder {status.newVersion} is ready to install.
+            </span>
+          </p>
+          <span className="table-actions">
+            <button type="button" className="btn btn--primary" onClick={() => void api.updater.install()}>
+              Restart &amp; install
+            </button>
+            <button type="button" className="btn btn--secondary" onClick={handleCheck} disabled={checking}>
+              Check again
+            </button>
+          </span>
+        </>
+      )}
+
+      {status.state === 'check-failed' && (
+        <>
+          <p className="update-panel__error" style={{ margin: '0 0 8px' }}>{status.message}</p>
+          <button type="button" className="btn btn--secondary" onClick={handleCheck} disabled={checking}>
+            Try again
           </button>
-          <button type="button" className="btn btn--secondary" onClick={() => void api.updater.openReleases()}>
-            Open GitHub page
+        </>
+      )}
+
+      {status.state === 'error' && (
+        <>
+          <p className="update-panel__error" style={{ margin: '0 0 8px' }}>{status.message}</p>
+          <button type="button" className="btn btn--secondary" onClick={handleCheck} disabled={checking}>
+            Try again
           </button>
-          <button type="button" className="btn btn--secondary" onClick={() => setStatus(null)}>
-            Later
-          </button>
-        </div>
-      ) : downloaded ? (
-        <div className="field__row">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void api.updater.revealSetup(status.filePath)}
-          >
-            Show in Downloads
-          </button>
-          <button type="button" className="btn btn--secondary" onClick={() => void api.updater.check()}>
-            Check again
-          </button>
-        </div>
-      ) : (
-        <div className="field__row">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            disabled={busy || status?.state === 'checking'}
-            onClick={() => {
-              setBusy(true)
-              void api.updater.check().then(setStatus).catch(() => undefined)
-            }}
-          >
-            {status?.state === 'checking' ? 'Checking…' : 'Check for Updates'}
+        </>
+      )}
+
+      {status.state !== 'downloading' && status.state !== 'available' && (
+        <div style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn--secondary" onClick={handleCheck} disabled={checking || status.state === 'checking'}>
+            Check for updates
           </button>
         </div>
       )}
-
-      {status?.state === 'check-failed' ? (
-        <div className="field__row">
-          <button type="button" className="btn btn--small btn--secondary" onClick={() => void api.updater.check()}>
-            Try Again
-          </button>
-        </div>
-      ) : null}
     </section>
   )
 }

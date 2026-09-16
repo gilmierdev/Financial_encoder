@@ -57,8 +57,8 @@ const api: FinancialEncoderApi = {
   },
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),
-    downloadSetup: () => ipcRenderer.invoke('updater:download-setup'),
-    revealSetup: (filePath: string) => ipcRenderer.invoke('updater:reveal-setup', filePath),
+    download: () => ipcRenderer.invoke('updater:download'),
+    install: () => ipcRenderer.invoke('updater:install'),
     openReleases: () => ipcRenderer.invoke('updater:open-releases'),
     onStatus: (callback: (status: UpdateStatus) => void) => {
       const listener = (_event: IpcRendererEvent, status: UpdateStatus) => callback(status)

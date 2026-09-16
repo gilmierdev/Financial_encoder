@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import EmptyState from '../../components/ui/EmptyState'
 import TypeToConfirmModal from '../../components/ui/TypeToConfirmModal'
 import TransactionForm from '../../components/transactions/TransactionForm'
+import { Icon } from '../../components/ui/Icon'
 import { api, ApiError } from '../../services/api'
 import { useSettings } from '../../contexts/SettingsContext'
 import { formatCurrency } from '../../utils/currency'
@@ -174,6 +175,7 @@ function Transactions(): React.JSX.Element {
       <div className="card tx-toolbar">
         <label className="tx-search" htmlFor="tx-search">
           <span className="sr-only">Search transactions</span>
+          <Icon name="search" size={16} />
           <input
             id="tx-search"
             type="search"

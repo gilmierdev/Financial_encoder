@@ -1,23 +1,22 @@
 import { registerIpcHandler } from '../services/ipc-handler'
-import { checkForUpdates, downloadSetup, openReleasesPage, revealSetupFile } from '../updater/update.service'
+import { checkForUpdates, downloadUpdate, installUpdate, openReleasesPage } from '../updater/update.service'
+import type { UpdateStatus } from '../updater/update-meta'
 
 /**
  * Renderer-facing update commands. Status pushes (checking / available /
- * setup-downloading / setup-downloaded / not-available / error) are delivered
- * reactively by the update service via the `updater:status` channel. The app
- * can download the newest installer into the user's Downloads folder; running
- * and installing it is always done manually by the user.
+ * downloading / downloaded / not-available / error) are delivered
+ * reactively by the update service via the `updater:status` channel.
  */
 export function registerUpdaterIpc(): void {
-  registerIpcHandler('updater:check', () => checkForUpdates())
+  registerIpcHandler<UpdateStatus>('updater:check', () => checkForUpdates())
 
-  registerIpcHandler('updater:download-setup', () => downloadSetup())
+  registerIpcHandler<UpdateStatus>('updater:download', () => downloadUpdate())
 
-  registerIpcHandler('updater:reveal-setup', (_event, filePath: unknown) => {
-    revealSetupFile(filePath)
+  registerIpcHandler<void>('updater:install', () => {
+    installUpdate()
   })
 
-  registerIpcHandler('updater:open-releases', () => {
+  registerIpcHandler<void>('updater:open-releases', () => {
     openReleasesPage()
   })
 }

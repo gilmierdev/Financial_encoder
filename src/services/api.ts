@@ -102,8 +102,8 @@ export interface Api {
   }
   updater: {
     check(): Promise<UpdateStatus>
-    downloadSetup(): Promise<UpdateStatus>
-    revealSetup(filePath: string): Promise<void>
+    download(): Promise<UpdateStatus>
+    install(): Promise<void>
     openReleases(): Promise<void>
     onStatus(callback: (status: UpdateStatus) => void): () => void
   }
@@ -226,29 +226,25 @@ export const api: Api = {
     async check() {
       const bridge = window.financialEncoder?.updater
       if (!bridge?.check) {
-        throw new Error('Update bridge is not available.')
+        return { state: 'unsupported' } as UpdateStatus
       }
       return unwrap(await bridge.check())
     },
-    async downloadSetup() {
+    async download() {
       const bridge = window.financialEncoder?.updater
-      if (!bridge?.downloadSetup) {
-        throw new Error('Update bridge is not available.')
+      if (!bridge?.download) {
+        return { state: 'unsupported' } as UpdateStatus
       }
-      return unwrap(await bridge.downloadSetup())
+      return unwrap(await bridge.download())
     },
-    async revealSetup(filePath) {
+    async install() {
       const bridge = window.financialEncoder?.updater
-      if (!bridge?.revealSetup) {
-        throw new Error('Update bridge is not available.')
-      }
-      await bridge.revealSetup(filePath)
+      if (!bridge?.install) return
+      await bridge.install()
     },
     async openReleases() {
       const bridge = window.financialEncoder?.updater
-      if (!bridge?.openReleases) {
-        throw new Error('Update bridge is not available.')
-      }
+      if (!bridge?.openReleases) return
       await bridge.openReleases()
     },
     onStatus(callback) {

@@ -6,11 +6,8 @@ export const MAX_RELEASE_NOTES_ITEM_LENGTH = 4000
 const MAX_ERROR_MESSAGE_LENGTH = 200
 
 /**
- * Discriminated status shared between the main process and the renderer. It
- * drives the update banner UI: the app checks for a new release, offers to
- * download the installer (setup) into the user's Downloads folder, and then
- * the user runs it manually. Nothing is installed or executed by the app
- * itself.
+ * Discriminated union representing every possible state the updater can be in.
+ * Shared between main process and renderer via the preload bridge.
  */
 export type UpdateStatus =
   | { state: 'unsupported' }
@@ -25,13 +22,13 @@ export type UpdateStatus =
     }
   | { state: 'not-available'; currentVersion: string }
   | {
-      state: 'setup-downloading'
+      state: 'downloading'
       newVersion: string
       percent: number
       transferred: number
       total: number
     }
-  | { state: 'setup-downloaded'; newVersion: string; filePath: string; size: number }
+  | { state: 'downloaded'; newVersion: string; filePath: string; size: number }
   | { state: 'error'; message: string }
 
 /**
@@ -109,17 +106,21 @@ export function parseReleaseNotes(raw: unknown): string[] {
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
 
-  const lines = plain
+  return plain
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, MAX_RELEASE_NOTES_ITEMS)
-    .map((line) => (line.length > MAX_RELEASE_NOTES_ITEM_LENGTH ? `${line.slice(0, MAX_RELEASE_NOTES_ITEM_LENGTH)}…` : line))
-
-  return lines
+    .map((line) => (
+      line.length > MAX_RELEASE_NOTES_ITEM_LENGTH
+        ? `${line.slice(0, MAX_RELEASE_NOTES_ITEM_LENGTH)}…`
+        : line
+    ))
 }
 
-/** Collapses an unknown error payload into one safe, short, single-line message. */
+/**
+ * Collapses an unknown error payload into one safe, short, single-line message.
+ */
 export function safeMessage(value: unknown, max = MAX_ERROR_MESSAGE_LENGTH): string {
   const text = typeof value === 'string' ? value : String(value ?? '')
   const condensed = text.replace(/\s+/g, ' ').trim()

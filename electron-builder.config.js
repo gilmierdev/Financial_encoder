@@ -17,16 +17,6 @@
 //
 //   See SIGNING.md for the full guide.
 //
-// Release publishing / auto-update:
-//   Updates are delivered from GitHub Releases over HTTPS (electron-updater).
-//   Publishing to GitHub requires a token:
-//     GH_TOKEN=<token with "repo" scope> npm run release:publish
-//   releaseType: 'release' makes electron-builder create a FINAL (published)
-//   release. electron-updater reads the GitHub releases Atom feed, which only
-//   contains published releases — draft/prerelease-only repos appear as
-//   "No published versions on GitHub". Keep this as 'release' and publish.
-//   (env EP_DRAFT / EP_PRE_RELEASE can still force draft/pre-release when
-//   you explicitly want to test before going public.)
 const path = require('path')
 
 const outputDir = process.env.FE_RELEASE_DIR || path.join(__dirname, 'release')
@@ -61,11 +51,17 @@ module.exports = {
     // legitimate certificate (see CSC_LINK above). Defaults to true.
     signAndEditExecutable: true,
   },
-  // Auto-update requires a deterministic per-user install directory, so the
-  // installer uses the standard one-click NSIS mode (no custom folder choice,
-  // no admin rights). The app-update.yml + latest.yml files that
-  // electron-updater consumes are generated automatically from this publish
-  // block when a release build is made.
+  publish: [
+    {
+      provider: 'github',
+      owner: 'gilmierdev',
+      repo: 'financial_encoder',
+      releaseType: 'release',
+    },
+  ],
+  releaseInfo: {
+    releaseNotesFile: 'RELEASE_NOTES.md',
+  },
   nsis: {
     oneClick: true,
     perMachine: false,
@@ -78,17 +74,5 @@ module.exports = {
     installerIcon: 'build/icon.ico',
     uninstallerIcon: 'build/icon.ico',
   },
-  publish: [
-    {
-      provider: 'github',
-      owner: 'gilmierdev',
-      repo: 'financial_encoder',
-      releaseType: 'release',
-      // HTTPS is always used; electron-builder refuses "http" for GitHub.
-    },
-  ],
-  // GitHub Release body comes from RELEASE_NOTES.md (used when publishing).
-  releaseInfo: {
-    releaseNotesFile: 'RELEASE_NOTES.md',
-  },
+
 }
