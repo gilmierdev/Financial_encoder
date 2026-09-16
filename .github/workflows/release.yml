@@ -1,0 +1,45 @@
+name: Release
+
+# Builds a production Windows installer on a tag push and publishes it as a
+# GitHub Release against the repo's releases (FINAL, not draft — required for
+# electron-updater to pick it up). No secrets are stored in the repository;
+# publishing uses the built-in GitHub Actions token.
+#
+# Tag format: v<semver>  e.g. v1.0.1 — the tag must match package.json version.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps --config electron-builder.config.js
+
+      - name: Type-check and test
+        run: npm run typecheck && npm test
+
+      - name: Build, package and publish to GitHub Releases
+        run: npm run release:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

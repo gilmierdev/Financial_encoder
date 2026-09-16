@@ -1,5 +1,26 @@
 # Financial Encoder — Release Notes
 
+## v1.0.1 (September 16, 2026)
+
+Automatic-update system made live.
+
+### Fixes
+
+- **Updates now actually publish.** Releases are created as **published** (final)
+  releases again — the previous draft-only config meant GitHub never advertised a
+  version, so installed copies reported *"No published versions on GitHub"*.
+- **Friendly update messages.** A cryptic raw error no longer appears in the
+  banner; updater failures are translated to clear, human-readable messages
+  (and the full detail is kept in `logs/`).
+- **Settings → Updates panel.** Check for updates, see your installed version,
+  download and restart-to-install — all from the Settings screen.
+- **Update-install safety.** A read-only snapshot of your database is taken
+  automatically before any schema migration if an update ships one, in addition
+  to the existing pre-install backup.
+
+Commands for maintainers (`npm run release` / `npm run release:publish`) and the
+CI Release workflow are documented in `UPDATE_SYSTEM.md`.
+
 ## v1.0.0 (September 16, 2026)
 
 First stable, distributable release of Financial Encoder.

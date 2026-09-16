@@ -3,6 +3,7 @@ import {
   normalizeFeedUrl,
   parseReleaseNotes,
   safeMessage,
+  friendlyUpdateMessage,
   MAX_RELEASE_NOTES_ITEM_LENGTH,
 } from '../../electron/updater/update-meta'
 
@@ -87,5 +88,53 @@ describe('safeMessage', () => {
     expect(safeMessage(undefined)).toBe('The update could not be completed.')
     expect(safeMessage(null)).toBe('The update could not be completed.')
     expect(safeMessage(new Error('boom'))).toBe('Error: boom')
+  })
+})
+
+describe('friendlyUpdateMessage', () => {
+  it('maps the no-published-releases error to a friendly notice', () => {
+    const err: Error & { code?: string } = new Error('No published versions on GitHub')
+    err.code = 'ERR_UPDATER_NO_PUBLISHED_VERSIONS'
+    expect(friendlyUpdateMessage(err)).toBe('No update is currently available.')
+  })
+
+  it('maps latest-version-not-found errors to a friendly notice', () => {
+    expect(friendlyUpdateMessage({ code: 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND' })).toBe(
+      'No update is currently available.',
+    )
+  })
+
+  it('maps missing channel file errors', () => {
+    expect(friendlyUpdateMessage({ code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' })).toBe(
+      'No update is currently available for your version.',
+    )
+  })
+
+  it('maps network errors to a connectivity message', () => {
+    expect(friendlyUpdateMessage(new Error('getaddrinfo ENOTFOUND github.com'))).toBe(
+      'The update check could not connect to the update server. Check your internet connection and try again.',
+    )
+    expect(friendlyUpdateMessage(new Error('net::ERR_INTERNET_DISCONNECTED'))).toBe(
+      'The update check could not connect to the update server. Check your internet connection and try again.',
+    )
+  })
+
+  it('maps checksum mismatches to a verification message', () => {
+    expect(friendlyUpdateMessage(new Error('Sha512 checksum mismatch for downloaded file'))).toBe(
+      'The downloaded update could not be verified and was not installed. Please try again.',
+    )
+  })
+
+  it('maps permission errors', () => {
+    expect(friendlyUpdateMessage(new Error('EPERM: operation not permitted, rename'))).toBe(
+      'The update could not be applied because of a permissions problem. Close other copies of the app and try again.',
+    )
+  })
+
+  it('falls back to a short safe message for unknown errors', () => {
+    expect(friendlyUpdateMessage(new Error('some unexpected electron error'))).toBe(
+      'some unexpected electron error',
+    )
+    expect(friendlyUpdateMessage(undefined)).toBe('The update could not be completed.')
   })
 })

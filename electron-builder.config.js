@@ -20,9 +20,13 @@
 // Release publishing / auto-update:
 //   Updates are delivered from GitHub Releases over HTTPS (electron-updater).
 //   Publishing to GitHub requires a token:
-//     GH_TOKEN=<token with "repo" scope> npm run dist -- --publish always
-//   A "draft" release is created by default; finalize it on GitHub (or pass
-//   releaseType: 'release' below) before users are notified.
+//     GH_TOKEN=<token with "repo" scope> npm run release:publish
+//   releaseType: 'release' makes electron-builder create a FINAL (published)
+//   release. electron-updater reads the GitHub releases Atom feed, which only
+//   contains published releases — draft/prerelease-only repos appear as
+//   "No published versions on GitHub". Keep this as 'release' and publish.
+//   (env EP_DRAFT / EP_PRE_RELEASE can still force draft/pre-release when
+//   you explicitly want to test before going public.)
 const path = require('path')
 
 const outputDir = process.env.FE_RELEASE_DIR || path.join(__dirname, 'release')
@@ -79,8 +83,12 @@ module.exports = {
       provider: 'github',
       owner: 'gilmierdev',
       repo: 'financial_encoder',
-      releaseType: 'draft',
+      releaseType: 'release',
       // HTTPS is always used; electron-builder refuses "http" for GitHub.
     },
   ],
+  // GitHub Release body comes from RELEASE_NOTES.md (used when publishing).
+  releaseInfo: {
+    releaseNotesFile: 'RELEASE_NOTES.md',
+  },
 }

@@ -3,7 +3,7 @@ import { autoUpdater } from 'electron-updater'
 import { AppError } from '../services/ipc-handler'
 import { logger } from '../services/logger.service'
 import { createBackup } from '../database/backup.service'
-import { normalizeFeedUrl, parseReleaseNotes, safeMessage } from './update-meta'
+import { normalizeFeedUrl, parseReleaseNotes, friendlyUpdateMessage } from './update-meta'
 import type { UpdateStatus } from './update-meta'
 
 const BACKGROUND_CHECK_DELAY_MS = 15_000
@@ -91,14 +91,16 @@ function setup(): void {
   autoUpdater.on('error', (err) => {
     logger.error(
       'automatic update error',
-      err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+      err instanceof Error ? { code: (err as { code?: string }).code, message: err.message, stack: err.stack } : String(err),
     )
     // A network/server failure while checking is softer than a failure while
-    // applying; let the renderer present the appropriate message.
+    // applying; let the renderer present the appropriate message. Raw codes
+    // and stack traces stay in the log; the banner shows a friendly message.
+    const message = friendlyUpdateMessage(err)
     if (status.state === 'available' || status.state === 'downloading' || status.state === 'downloaded') {
-      broadcast({ state: 'error', message: safeMessage(err) })
+      broadcast({ state: 'error', message })
     } else {
-      broadcast({ state: 'check-failed', message: safeMessage(err) })
+      broadcast({ state: 'check-failed', message })
     }
   })
 }

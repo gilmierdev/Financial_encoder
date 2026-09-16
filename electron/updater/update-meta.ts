@@ -127,3 +127,53 @@ export function safeMessage(value: unknown, max = MAX_ERROR_MESSAGE_LENGTH): str
   }
   return condensed.length > max ? `${condensed.slice(0, max)}…` : condensed
 }
+
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+  // The GitHub releases Atom feed contained no published (finalized) release.
+  ERR_UPDATER_NO_PUBLISHED_VERSIONS: 'No update is currently available.',
+  ERR_UPDATER_LATEST_VERSION_NOT_FOUND: 'No update is currently available.',
+  ERR_UPDATER_CHANNEL_FILE_NOT_FOUND: 'No update is currently available for your version.',
+  ERR_UPDATER_INVALID_RELEASE_FEED: 'The update information could not be read. Please try again later.',
+  ERR_UPDATER_OLD_VERSION_NOT_FOUND: 'No update is currently available.',
+  ERR_UPDATER_DISABLED_FOR_CHANNEL: 'Updates are not available for this build.',
+  ERR_UPDATER_PUBLICATION_FAILED: 'The update could not be published.',
+}
+
+/**
+ * Turns any electron-updater / HTTP / network error into one short,
+ * user-friendly sentence. Technical details (codes, stack traces, server
+ * messages) stay in the logs; ordinary users never see them.
+ */
+export function friendlyUpdateMessage(err: unknown): string {
+  const code = typeof (err as { code?: unknown } | null)?.code === 'string'
+    ? (err as { code: string }).code
+    : ''
+  const byCode = ERROR_CODE_MESSAGES[code]
+  if (byCode !== undefined) {
+    return byCode
+  }
+
+  const text = typeof err === 'string'
+    ? err
+    : err instanceof Error
+      ? err.message
+      : String(err ?? '')
+  const lower = text.toLowerCase()
+
+  if (/(getaddrinfo|enotfound|enetunreach|econnrefused|econnreset|etimedout|esockettimedout|timeout|tunnel|socks|network|internet|offline|dns|certificate|ssl|tls)/i.test(lower)) {
+    return 'The update check could not connect to the update server. Check your internet connection and try again.'
+  }
+  if (/(sha512|checksum|integrity|hash mismatch|corrupt)/i.test(lower)) {
+    return 'The downloaded update could not be verified and was not installed. Please try again.'
+  }
+  if (/(eacces|eperm|permission|access is denied|write protected)/i.test(lower)) {
+    return 'The update could not be applied because of a permissions problem. Close other copies of the app and try again.'
+  }
+  if (/(disk full|no space|enospc|insufficient)/i.test(lower)) {
+    return 'The update could not be downloaded because there is not enough free disk space.'
+  }
+  if (/(install|apply|replace|lock|in use|another instance)/i.test(lower)) {
+    return 'The update could not be installed. Make sure no other copy of the app is running and try again.'
+  }
+  return safeMessage(text)
+}

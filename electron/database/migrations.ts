@@ -67,7 +67,7 @@ const migrations: Migration[] = [
   },
 ]
 
-export function runMigrations(db: Database.Database): void {
+export function ensureMigrationTable(db: Database.Database): void {
   // The migration tracking table must exist before any migration is applied
   // or inspected.
   db.exec(`
@@ -77,6 +77,21 @@ export function runMigrations(db: Database.Database): void {
       applied_at TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `)
+}
+
+/** Number of migrations that have not been applied to this database yet. */
+export function pendingMigrationCount(db: Database.Database): number {
+  ensureMigrationTable(db)
+  const applied = new Set(
+    (db.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]).map(
+      (r) => r.version,
+    ),
+  )
+  return migrations.filter((m) => !applied.has(m.version)).length
+}
+
+export function runMigrations(db: Database.Database): void {
+  ensureMigrationTable(db)
 
   const applied = new Set(
     (db.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]).map(

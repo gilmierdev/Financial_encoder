@@ -42,6 +42,8 @@ financial_encoder/
 | `npm run build` | Build renderer + main/preload (no dev server) |
 | `npm run dist` | Clean build + package the Windows installer (`release/`) |
 | `npm run dist:dir` | Build + create `release/win-unpacked` only (no installer) |
+| `npm run release` | Build + package installer + `latest.yml` + blockmap (no upload) |
+| `npm run release:publish` | Same as release, then create a **published** GitHub Release (`GH_TOKEN` required) |
 | `npm run typecheck` | Type-check both TypeScript projects |
 | `npm run lint` | Type-check (uses the same strict configs) |
 | `npm test` | Run the unit test suite (Vitest) |
@@ -49,11 +51,18 @@ financial_encoder/
 ## Create a release
 
 ```powershell
-npm run build
-npm run dist
+npm run release              # package locally (no upload)
+npm run release:publish      # build + create the GitHub Release (needs GH_TOKEN)
 ```
 
-Output (installer + intermediate artifacts):
+`release:publish` creates a **published** (final) GitHub Release — never a draft — using the
+`GH_TOKEN` environment variable (a PAT with `repo` scope). Reuse it in your shell or CI, and
+never commit it to the repository.
+
+Or push a `v*` tag — the **Release** GitHub Action builds and publishes it
+automatically (tag must match the `package.json` version).
+
+Output (installer + update artifacts):
 
 ```
 release/

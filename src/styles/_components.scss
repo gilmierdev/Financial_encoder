@@ -250,6 +250,25 @@
   opacity: 1;
 }
 
+/* Settings → Updates ------------------------------------------------------- */
+
+.update-panel__version {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.update-panel__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-panel__error {
+  color: var(--danger);
+}
+
 /* Empty state ------------------------------------------------------------ */
 
 .empty-state {

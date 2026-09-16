@@ -1,6 +1,6 @@
 {
   "name": "financial_encoder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Financial Encoder — a local/offline financial encoding and analysis desktop application for Windows.",
   "main": "dist-electron/main.js",
   "author": "GilmierDev",
@@ -21,6 +21,8 @@
     "build:renderer": "vite build",
     "dist": "npm run build && electron-builder --config electron-builder.config.js",
     "dist:dir": "npm run build && electron-builder --dir --config electron-builder.config.js",
+    "release": "npm run build && electron-builder --config electron-builder.config.js --publish never",
+    "release:publish": "npm run build && electron-builder --config electron-builder.config.js --publish always",
     "electron:build": "npm run dist",
     "electron:dev": "npm run dev"
   },

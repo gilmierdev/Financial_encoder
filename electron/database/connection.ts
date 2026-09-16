@@ -4,7 +4,7 @@ import * as path from 'path'
 import { app } from 'electron'
 import { AppError } from '../services/ipc-handler'
 import { logger } from '../services/logger.service'
-import { runMigrations } from './migrations'
+import { runMigrations, pendingMigrationCount } from './migrations'
 import { seedIfEmpty } from './seed'
 
 export interface DataDirectories {
@@ -25,6 +25,23 @@ export interface DatabaseStatus {
 
 let db: Database.Database | null = null
 let directories: DataDirectories | null = null
+
+function stamp(): string {
+  const d = new Date()
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+}
+
+/**
+ * Takes a consistent snapshot of the current database before any pending
+ * schema migration is applied, so a badly broken migration can never leave the
+ * user without a recoverable copy. Uses SQLite VACUUM INTO (offline-safe, no
+ * bound parameters possible — the path is generated here and escaped).
+ */
+function snapshotBeforeMigration(instance: Database.Database, dest: string): void {
+  const escaped = String(dest).replace(/'/g, "''")
+  instance.exec(`VACUUM INTO '${escaped}'`)
+}
 
 /** Directories used for all application data. Never inside the install folder. */
 export function getDataDirectories(): DataDirectories {
@@ -65,6 +82,20 @@ export function initDatabase(): Database.Database {
     // Overwrite deleted rows with zeros instead of leaving freed pages readable.
     instance.pragma('secure_delete = ON')
     db = instance
+
+    // Safety: if the newly opened database is behind the latest schema, take a
+    // snapshot of the pre-migration state first. Best-effort only — a failure
+    // here must not block the app from starting.
+    try {
+      const pending = pendingMigrationCount(instance)
+      if (pending > 0) {
+        const snapshot = path.join(dirs.backups, `pre-migration-${stamp()}.db`)
+        snapshotBeforeMigration(instance, snapshot)
+        logger.info('pre-migration database snapshot created', { snapshot, pending })
+      }
+    } catch (err) {
+      logger.warn('pre-migration snapshot skipped', err instanceof Error ? err.message : String(err))
+    }
 
     runMigrations(instance)
     seedIfEmpty(instance)

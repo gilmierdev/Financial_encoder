@@ -12,9 +12,14 @@ embeds an `app-update.yml` that points at the release feed:
 owner: gilmierdev
 repo: financial_encoder
 provider: github
-releaseType: draft
+releaseType: release
 updaterCacheDirName: financial_encoder-updater
 ```
+
+> `releaseType: release` matters: electron-updater reads the GitHub **releases
+> Atom feed**, which only contains **published** (finalized) releases. If a
+> release is left as a *Draft*, the app reports
+> «No published versions on GitHub» even though the tag exists.
 
 Lifecycle:
 
@@ -73,31 +78,67 @@ Notes:
 
 ## Publish an update (GitHub Releases)
 
-The updater downloads from the latest **GitHub Release** of `gilmierdev/financial_encoder`.
-To ship a new version to users:
+The updater downloads from the latest **published** GitHub Release of
+`gilmierdev/financial_encoder`. **Draft releases are never served** — they do
+not appear in the releases feed, so the installed app sees
+«No published versions on GitHub». Always publish (finalize) the release.
 
-1. Bump `version` in `package.json`.
-2. Build the installer with signing.
-3. Publish the artifacts:
+### One-command publish (recommended)
+
+```powershell
+$env:GH_TOKEN = "<token with repo scope>"
+npm run release:publish
+```
+
+This builds the renderer + main process, packages the NSIS installer, generates
+`latest.yml` + the `.blockmap`, creates the GitHub Release **as `release`
+(final/published)**, and uploads the three artifacts. The release type is fixed
+to `release` in `electron-builder.config.js`.
+
+### Build only (no publishing)
+
+```powershell
+npm run release
+```
+
+Same build, no upload — everything stays in `release/`. You can then upload the
+artifacts manually on github.com. `latest.yml` must sit in the release root next
+to the installer.
+
+### Version bump → release flow
+
+1. Bump `version` in `package.json` (e.g. `1.0.0` → `1.0.1`).
+2. Commit, then tag the commit and push:
 
    ```powershell
-   npm run build
-   $env:GH_TOKEN = "<token with repo scope>"
-   npm run dist -- --publish always
+   git add package.json package-lock.json
+   git commit -m "Release 1.0.1"
+   git tag v1.0.1
+   git push origin main --tags
    ```
 
-   electron-builder creates a **draft** release (configured via `releaseType: 'draft'`) and
-   uploads `Financial-Encoder-Setup-<version>.exe`, its `.blockmap`, and `latest.yml`.
-4. **Finalize the draft release on GitHub** (publish it). Users are only notified once the
-   release is public.
-5. Set that release's notes to the plain-text or HTML summary you want shown in the update
-   banner (the banner strips HTML and caps both line count and length).
+3. Either run the GitHub Actions **Release** workflow (tags `v*` auto-trigger
+   it) or run `npm run release:publish` locally with `GH_TOKEN` set.
+4. Confirm on github.com that the release shows **Published** (green, not
+   «Draft») and contains `Financial-Encoder-Setup-1.0.1.exe`, its `.blockmap`
+   and `latest.yml`.
 
-Manual alternative: create the release on github.com and upload the three artifacts above.
-`latest.yml` must sit in the release root next to the installer.
+Manual alternative: create the release on github.com and upload the three
+artifacts above, then click **Publish release**.
 
-> **Important:** never upload a `latest.yml` that does not match the installer in the same
-> release, and always finalize releases. A draft or mismatched release can cause failed checks.
+> **Important:** never upload a `latest.yml` that does not match the installer
+> in the same release, and always finalize releases. A draft or mismatched
+> release causes failed checks or «No published versions on GitHub».
+
+### Deliverability example
+
+| Step | Action |
+| --- | --- |
+| 1 | Publish `v1.0.0` (build + upload + **Publish release** on GitHub). |
+| 2 | Users install `Financial-Encoder-Setup-1.0.0.exe`. |
+| 3 | You bump to `1.0.1`, build, publish `v1.0.1`. |
+| 4 | Installed `1.0.0` app checks → sees `1.0.1` in `latest.yml` → banner. |
+| 5 | User downloads, restarts, app becomes 1.0.1. Database untouched. |
 
 ## Integrity and security
 
@@ -171,12 +212,22 @@ Manual alternative: create the release on github.com and upload the three artifa
 
 ## Troubleshooting
 
+- **«No published versions on GitHub»** — the root cause is that **no published
+  (finalized) GitHub Release exists** for `gilmierdev/financial_encoder`
+  (drafts are invisible to electron-updater). Publish `v1.0.0` (or newer), then
+  re-check. The app previously built the installer but never published it.
 - **Banner never appears / not-available every time** — confirm the release is **finalized** on
-  GitHub and that `latest.yml` in it has a newer `version`.
+  GitHub and that `latest.yml` inside it has a newer `version` than the installed app.
 - **Download fails partway** — retry from the banner; electron-updater resumes from its cache.
 - **sha512 mismatch** — `latest.yml` and the installer were from different builds. Rebuild and
   re-upload both together.
 - **EPERM during `npm run dist`** — OneDrive lock; build with `FE_RELEASE_DIR` outside OneDrive
   (see above).
+- **`spawn UNKNOWN` during `npm run release` (NSIS step)** — Smart App Control (or another
+  Application Control policy) blocks the freshly-built, unsigned NSIS stub from executing to
+  extract the uninstaller. **Do not disable SAC.** Either sign the build with a legitimate
+  certificate (see `SIGNING.md`) or run the build where the policy does not apply — e.g. the
+  included GitHub Actions **Release** workflow, which builds on a fresh Windows runner with no
+  such policy.
 - **Updater logs** — everything is written to `logs/` in the user-data folder and mirrored to the
   console in dev.

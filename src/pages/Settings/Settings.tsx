@@ -6,6 +6,7 @@ import { useSettings } from '../../contexts/SettingsContext'
 import { currencySymbol } from '../../utils/currency'
 import { logToMain } from '../../services/logger'
 import { api, ApiError } from '../../services/api'
+import UpdatePanel from '../../components/update/UpdatePanel'
 import type { BackupRecord } from '../../../electron/types/ipc'
 
 function formatBytes(bytes: number): string {
@@ -373,6 +374,10 @@ function Settings(): React.JSX.Element {
             </div>
           </div>
         </section>
+      </div>
+
+      <div className="settings-grid">
+        <UpdatePanel />
       </div>
 
       <div className="settings-grid">
