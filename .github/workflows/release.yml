@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Rebuild native modules for Electron
-        run: npx electron-builder install-app-deps --config electron-builder.config.js
+        run: npx electron-builder install-app-deps
 
       - name: Type-check and test
         run: npm run typecheck && npm test
