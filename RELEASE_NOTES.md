@@ -1,5 +1,17 @@
 # Financial Encoder — Release Notes
 
+## v1.0.6 (September 16, 2026)
+
+### Updates
+
+- **In-app setup downloader.** When an update is available, the banner and
+  Settings → Updates now offer **Download setup**: the newest
+  `Financial-Encoder-Setup-<version>.exe` is streamed straight from GitHub into
+  your **Downloads** folder, with a live progress bar. When it finishes, a
+  **Show in Downloads** button reveals it in File Explorer so you can run the
+  installer yourself. Alternatively, **Open GitHub page** keeps the browser
+  route. The app still never installs or launches anything by itself.
+
 ## v1.0.5 (September 16, 2026)
 
 ### Updates

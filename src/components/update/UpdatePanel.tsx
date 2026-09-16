@@ -3,11 +3,16 @@ import { api } from '../../services/api'
 import type { UpdateStatus } from '../../../electron/types/ipc'
 import { Icon } from '../ui/Icon'
 
+function formatMegabytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024)
+  return mb >= 100 ? mb.toFixed(0) : mb.toFixed(1)
+}
+
 /**
- * Settings → Updates. A compact control panel for the update-notification
- * flow: current version, check for updates, and open the GitHub releases page
- * when a new version exists. The app never downloads or installs updates
- * itself; installing happens in the browser/installer.
+ * Settings → Updates. A compact control panel for the update flow: current
+ * version, check for updates, and download the newest installer into the user's
+ * Downloads folder (which they then run themselves). The app never installs or
+ * runs anything by itself.
  */
 function UpdatePanel(): React.JSX.Element {
   const [currentVersion, setCurrentVersion] = useState<string>('')
@@ -37,6 +42,8 @@ function UpdatePanel(): React.JSX.Element {
   }, [])
 
   const available = status?.state === 'available'
+  const downloading = status?.state === 'setup-downloading'
+  const downloaded = status?.state === 'setup-downloaded'
 
   return (
     <section className="card">
@@ -44,9 +51,9 @@ function UpdatePanel(): React.JSX.Element {
         <div>
           <h2 className="card__title">Updates</h2>
           <p className="settings-card-head__desc">
-            Financial Encoder checks GitHub for new versions. When one is available you
-            download and install it from the GitHub releases page; the app never updates
-            itself without your action.
+            Financial Encoder checks GitHub for new versions. When one is available you can
+            download the installer straight into your Downloads folder and run it yourself; the
+            app never updates itself without your action.
           </p>
         </div>
       </div>
@@ -82,6 +89,21 @@ function UpdatePanel(): React.JSX.Element {
                 New version available: {status.newVersion} (you have {status.currentVersion})
               </span>
             )}
+
+            {downloading && (
+              <span className="field__hint">
+                Downloading setup&hellip; {Math.min(100, Math.max(0, status.percent))}% &middot;{' '}
+                {status.total > 0
+                  ? `${formatMegabytes(status.transferred)} of ${formatMegabytes(status.total)} MB`
+                  : `${formatMegabytes(status.transferred)} MB`}
+              </span>
+            )}
+
+            {downloaded && (
+              <span className="field__hint">
+                Setup {status.newVersion} downloaded to your Downloads folder — run it to update.
+              </span>
+            )}
           </div>
         </div>
       ) : (
@@ -95,15 +117,32 @@ function UpdatePanel(): React.JSX.Element {
           <button
             type="button"
             className="btn btn--primary"
+            disabled={busy}
             onClick={() => {
               setBusy(true)
-              void api.updater.openReleases().finally(() => setBusy(false))
+              void api.updater.downloadSetup().then(setStatus).catch(() => undefined)
             }}
           >
-            {busy ? 'Opening…' : 'Download from GitHub'}
+            {busy ? 'Starting…' : 'Download setup'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={() => void api.updater.openReleases()}>
+            Open GitHub page
           </button>
           <button type="button" className="btn btn--secondary" onClick={() => setStatus(null)}>
             Later
+          </button>
+        </div>
+      ) : downloaded ? (
+        <div className="field__row">
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => void api.updater.revealSetup(status.filePath)}
+          >
+            Show in Downloads
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={() => void api.updater.check()}>
+            Check again
           </button>
         </div>
       ) : (

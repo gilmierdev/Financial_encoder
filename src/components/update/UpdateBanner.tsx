@@ -5,11 +5,16 @@ import { Icon } from '../ui/Icon'
 
 const BRIEF_NOTICE_MS = 6000
 
+function formatMegabytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024)
+  return mb >= 100 ? mb.toFixed(0) : mb.toFixed(1)
+}
+
 /**
- * Full-width banner that surfaces the update-notification flow at the top of
- * the content area: an announcement that a new release is available with
- * release notes, plus a button that opens the GitHub releases page in the
- * browser. The app does not download or install anything itself. In
+ * Full-width banner that surfaces the update flow at the top of the content
+ * area: an announcement that a new release is available with release notes, a
+ * button that downloads the installer into the user's Downloads folder, and a
+ * prompt to run it. The app never installs or runs anything by itself. In
  * development (unsupported state) it renders nothing.
  */
 function UpdateBanner(): React.JSX.Element | null {
@@ -21,7 +26,7 @@ function UpdateBanner(): React.JSX.Element | null {
   useEffect(() => {
     const unsubscribe = api.updater.onStatus((next) => {
       setStatus(next)
-      if (next.state === 'available' || next.state === 'error') {
+      if (next.state === 'available' || next.state === 'setup-downloaded' || next.state === 'error') {
         setDismissed(false)
       }
       if (next.state === 'check-failed') {
@@ -96,11 +101,57 @@ function UpdateBanner(): React.JSX.Element | null {
           )}
         </div>
         <div className="update-banner__actions">
-          <button type="button" className="btn btn--primary btn--sm" onClick={() => void api.updater.openReleases()}>
-            Download from GitHub
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => void api.updater.downloadSetup()}>
+            Download setup
           </button>
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => setDismissed(true)}>
             Later
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (status.state === 'setup-downloading') {
+    const percent = Math.min(100, Math.max(0, status.percent))
+    return (
+      <div className="update-banner update-banner--info" role="status">
+        <Icon name="update" size={16} />
+        <div className="update-banner__body">
+          <p className="update-banner__title">Downloading setup {status.newVersion}&hellip;</p>
+          <div className="update-banner__progress" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+            <div className="update-banner__progress-bar" style={{ width: `${percent}%` }} />
+          </div>
+          <p className="update-banner__meta">
+            {percent}% &middot; {status.total > 0
+              ? `${formatMegabytes(status.transferred)} of ${formatMegabytes(status.total)} MB`
+              : `${formatMegabytes(status.transferred)} MB`}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status.state === 'setup-downloaded') {
+    return (
+      <div className="update-banner update-banner--ok" role="status">
+        <Icon name="update" size={16} />
+        <div className="update-banner__body">
+          <p className="update-banner__title">
+            Setup {status.newVersion} downloaded &mdash; saved to your Downloads folder
+          </p>
+          <p className="update-banner__meta">Run the installer yourself to finish updating. Your data is never touched.</p>
+        </div>
+        <div className="update-banner__actions">
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() => void api.updater.revealSetup(status.filePath)}
+          >
+            Show in Downloads
+          </button>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setDismissed(true)}>
+            Done
           </button>
         </div>
       </div>

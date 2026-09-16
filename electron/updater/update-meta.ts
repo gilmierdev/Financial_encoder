@@ -7,9 +7,10 @@ const MAX_ERROR_MESSAGE_LENGTH = 200
 
 /**
  * Discriminated status shared between the main process and the renderer. It
- * drives the update banner UI: the app checks for a new release and shows the
- * user where to download it. Nothing is downloaded or installed by the app
- * itself (available → user opens the releases page in their browser).
+ * drives the update banner UI: the app checks for a new release, offers to
+ * download the installer (setup) into the user's Downloads folder, and then
+ * the user runs it manually. Nothing is installed or executed by the app
+ * itself.
  */
 export type UpdateStatus =
   | { state: 'unsupported' }
@@ -23,6 +24,14 @@ export type UpdateStatus =
       releaseDate: string
     }
   | { state: 'not-available'; currentVersion: string }
+  | {
+      state: 'setup-downloading'
+      newVersion: string
+      percent: number
+      transferred: number
+      total: number
+    }
+  | { state: 'setup-downloaded'; newVersion: string; filePath: string; size: number }
   | { state: 'error'; message: string }
 
 /**

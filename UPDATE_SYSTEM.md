@@ -27,11 +27,12 @@ Lifecycle:
    main process asks electron-updater for the latest version.
 2. **Notify** — if a newer version exists, the renderer shows an **Update available** banner
    (new version, current version, sanitized release notes).
-3. **Download from GitHub** — the banner/panel action opens the GitHub releases page in the
-   system browser. The app itself never downloads, extracts, or runs installer binaries.
-4. **Install manually** — you download `Financial-Encoder-Setup-<version>.exe` from the releases
-   page (verified against the **sha512** published in `latest.yml`) and run it. The NSIS
-   installer replaces the application files; the database and user data are never touched.
+3. **Download setup** — the banner/panel action downloads `Financial-Encoder-Setup-<version>.exe`
+   straight from the GitHub release into the user's **Downloads** folder, streaming with a live
+   progress bar (an **Open GitHub page** link stays available as a browser route). Only the
+   installer file is written; nothing is executed.
+4. **Install manually** — you run the downloaded installer yourself. The NSIS installer
+   replaces the application files; the database and user data are never touched.
 5. **Up to date / error** — the panel confirms an up-to-date install or shows a helpful error
    with a retry.
 
@@ -137,7 +138,7 @@ artifacts above, then click **Publish release**.
 | 2 | Users install `Financial-Encoder-Setup-1.0.0.exe`. |
 | 3 | You bump to `1.0.1`, build, publish `v1.0.1`. |
 | 4 | Installed `1.0.0` app checks → sees `1.0.1` in `latest.yml` → banner. |
-| 5 | User opens the releases page, downloads, runs the installer, app becomes 1.0.1. Database untouched. |
+| 5 | User clicks **Download setup** → installer lands in Downloads → user runs it → app becomes 1.0.1. Database untouched. |
 
 ## Integrity and security
 
@@ -195,15 +196,18 @@ artifacts above, then click **Publish release**.
 | 1 | App at newest version, online | Panel shows “No update is currently available.”; no banner. |
 | 2 | App older than feed | “Update available: vX (you have vY)” with sanitized release notes. |
 | 3 | “Later” on available | Banner hides. No nag until a re-check. |
-| 4 | “Download from GitHub” | System browser opens the releases page; nothing downloaded by the app. |
-| 5 | Offline / blocked feed | Error/brief banner with friendly message + “Try again”. No crash. |
-| 6 | Corrupt/evil feed | Check fails gracefully; no download attempt; friendly error. |
-| 7 | `FINANCIAL_ENCODER_UPDATE_FEED=http://example.com` | Feed rejected (banner never appears); bad env ignored. |
-| 8 | Development (`npm run dev`) | No update code runs at all. |
-| 9 | Same version offered | Not shown (“You're up to date”). |
-| 10 | Release notes contain HTML | Rendered as plain text; tags stripped; length capped. |
-| 11 | Update with schema migration | Migrations run on next launch after installing manually; data intact. |
-| 12 | Uninstall after updating | Uninstaller removes the app but keeps `AppData\Roaming\FinancialEncoder`. |
+| 4 | “Download setup” | Progress bar with %, transferred/total MB; file saved to Downloads. |
+| 5 | Download completes | “Setup vX downloaded — saved to your Downloads folder” with “Show in Downloads”. |
+| 6 | “Show in Downloads” | File Explorer opens with the installer selected. Nothing runs it. |
+| 7 | Cleanup on failure | Failed/interrupted download leaves no stray `.part` file; banner returns to available/error. |
+| 8 | Offline / blocked feed | Error/brief banner with friendly message + “Try again”. No crash. |
+| 9 | Corrupt/evil feed | Check fails gracefully; no download attempt; friendly error. |
+| 10 | `FINANCIAL_ENCODER_UPDATE_FEED=http://example.com` | Feed rejected (banner never appears); bad env ignored. |
+| 11 | Development (`npm run dev`) | No update code runs at all. |
+| 12 | Same version offered | Not shown (“You're up to date”). |
+| 13 | Release notes contain HTML | Rendered as plain text; tags stripped; length capped. |
+| 14 | Update with schema migration | Migrations run on next launch after installing manually; data intact. |
+| 15 | Uninstall after updating | Uninstaller removes the app but keeps `AppData\Roaming\FinancialEncoder`. |
 
 ## Troubleshooting
 
@@ -213,6 +217,10 @@ artifacts above, then click **Publish release**.
   re-check. The app previously built the installer but never published it.
 - **Banner never appears / not-available every time** — confirm the release is **finalized** on
   GitHub and that `latest.yml` inside it has a newer `version` than the installed app.
+- **"Download setup" fails** — the app streams
+  `/releases/latest/download/Financial-Encoder-Setup-<version>.exe` (GitHub follows a couple of
+  redirects to its CDN). A transient network/proxy problem fails the download and the banner
+  returns to **available**; retry from there. A failed attempt never leaves a stray partial file.
 - **`spawn UNKNOWN` during `npm run release` (NSIS step)** — Smart App Control (or another
   Application Control policy) blocks the freshly-built, unsigned NSIS stub from executing to
   extract the uninstaller. **Do not disable SAC.** Either sign the build with a legitimate

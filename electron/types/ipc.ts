@@ -104,6 +104,8 @@ export interface FinancialEncoderApi {
   }
   updater: {
     check(): Promise<IpcResult<UpdateStatus>>
+    downloadSetup(): Promise<IpcResult<UpdateStatus>>
+    revealSetup(filePath: string): Promise<IpcResult<void>>
     openReleases(): Promise<IpcResult<void>>
     onStatus(callback: (status: UpdateStatus) => void): () => void
   }

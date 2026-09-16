@@ -102,6 +102,8 @@ export interface Api {
   }
   updater: {
     check(): Promise<UpdateStatus>
+    downloadSetup(): Promise<UpdateStatus>
+    revealSetup(filePath: string): Promise<void>
     openReleases(): Promise<void>
     onStatus(callback: (status: UpdateStatus) => void): () => void
   }
@@ -227,6 +229,20 @@ export const api: Api = {
         throw new Error('Update bridge is not available.')
       }
       return unwrap(await bridge.check())
+    },
+    async downloadSetup() {
+      const bridge = window.financialEncoder?.updater
+      if (!bridge?.downloadSetup) {
+        throw new Error('Update bridge is not available.')
+      }
+      return unwrap(await bridge.downloadSetup())
+    },
+    async revealSetup(filePath) {
+      const bridge = window.financialEncoder?.updater
+      if (!bridge?.revealSetup) {
+        throw new Error('Update bridge is not available.')
+      }
+      await bridge.revealSetup(filePath)
     },
     async openReleases() {
       const bridge = window.financialEncoder?.updater
