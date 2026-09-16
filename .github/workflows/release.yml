@@ -45,6 +45,8 @@ jobs:
       # target release so electron-builder only ever uploads into it.
       - name: Remove stale releases for this tag
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $token = $env:GITHUB_TOKEN
           $h = @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
@@ -57,6 +59,8 @@ jobs:
 
       - name: Pre-create the target release
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $token = $env:GITHUB_TOKEN
           $h = @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
