@@ -39,6 +39,38 @@ jobs:
       - name: Type-check and test
         run: npm run typecheck && npm test
 
+      # electron-builder can race and create two releases with the same tag
+      # (two parallel publisher instances). Make publishing deterministic:
+      # delete any stale duplicates for this tag, then pre-create the single
+      # target release so electron-builder only ever uploads into it.
+      - name: Remove stale releases for this tag
+        shell: pwsh
+        run: |
+          $token = $env:GITHUB_TOKEN
+          $h = @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
+          $rels = Invoke-RestMethod -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
+          $stale = $rels | Where-Object { $_.tag_name -eq $env:GITHUB_REF_NAME }
+          foreach ($r in $stale) {
+            Invoke-RestMethod -Method Delete -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($r.id)"
+            Write-Host "deleted stale release id $($r.id)"
+          }
+
+      - name: Pre-create the target release
+        shell: pwsh
+        run: |
+          $token = $env:GITHUB_TOKEN
+          $h = @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
+          $existing = $null
+          try { $existing = Invoke-RestMethod -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:GITHUB_REF_NAME" } catch { }
+          if ($null -eq $existing) {
+            $notes = Get-Content -Raw RELEASE_NOTES.md
+            $body = @{ tag_name = $env:GITHUB_REF_NAME; name = $env:GITHUB_REF_NAME; body = $notes } | ConvertTo-Json
+            Invoke-RestMethod -Method Post -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases" -Body $body
+            Write-Host "pre-created release $env:GITHUB_REF_NAME"
+          } else {
+            Write-Host "release $env:GITHUB_REF_NAME already exists"
+          }
+
       - name: Build, package and publish to GitHub Releases
         run: npm run release:publish
         env:
