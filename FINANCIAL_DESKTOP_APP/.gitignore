@@ -1,0 +1,35 @@
+node_modules/
+dist/
+dist-electron/
+dist-renderer/
+release/
+*.log
+.env
+.env.local
+.env.*
+!.env.example
+
+# Secrets & credentials
+*.pem
+*.p12
+*.pfx
+*.key
+*.cer
+*.crt
+*.keystore
+*.jks
+
+# Backups & application data (never commit financial data)
+*.febak
+*.db
+*.db-wal
+*.db-shm
+database.db
+AppData/Roaming/FinancialEncoder
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
