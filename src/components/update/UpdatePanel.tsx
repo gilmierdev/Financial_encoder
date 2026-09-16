@@ -3,15 +3,11 @@ import { api } from '../../services/api'
 import type { UpdateStatus } from '../../../electron/types/ipc'
 import { Icon } from '../ui/Icon'
 
-function formatMegabytes(bytes: number): string {
-  const mb = bytes / (1024 * 1024)
-  return mb >= 100 ? mb.toFixed(0) : mb.toFixed(1)
-}
-
 /**
- * Settings → Updates. A compact control panel for the self-update flow:
- * current version, check for updates, download, and restart-and-install.
- * Mirrors the status the UpdateBanner uses, but stays in Settings.
+ * Settings → Updates. A compact control panel for the update-notification
+ * flow: current version, check for updates, and open the GitHub releases page
+ * when a new version exists. The app never downloads or installs updates
+ * itself; installing happens in the browser/installer.
  */
 function UpdatePanel(): React.JSX.Element {
   const [currentVersion, setCurrentVersion] = useState<string>('')
@@ -41,7 +37,6 @@ function UpdatePanel(): React.JSX.Element {
   }, [])
 
   const available = status?.state === 'available'
-  const downloaded = status?.state === 'downloaded'
 
   return (
     <section className="card">
@@ -49,8 +44,9 @@ function UpdatePanel(): React.JSX.Element {
         <div>
           <h2 className="card__title">Updates</h2>
           <p className="settings-card-head__desc">
-            Financial Encoder checks GitHub for new versions and updates itself automatically
-            without touching your financial data.
+            Financial Encoder checks GitHub for new versions. When one is available you
+            download and install it from the GitHub releases page; the app never updates
+            itself without your action.
           </p>
         </div>
       </div>
@@ -86,21 +82,6 @@ function UpdatePanel(): React.JSX.Element {
                 New version available: {status.newVersion} (you have {status.currentVersion})
               </span>
             )}
-
-            {status.state === 'downloading' && (
-              <span className="field__hint">
-                Downloading update&hellip; {Math.min(100, Math.max(0, status.percent))}% &middot;{' '}
-                {formatMegabytes(status.transferred)} of {formatMegabytes(status.total)} MB
-              </span>
-            )}
-
-            {downloaded && (
-              <span className="field__hint">Update ready &mdash; restart and install {status.newVersion}.</span>
-            )}
-
-            {status.state === 'installing' && (
-              <span className="field__hint">Installing {status.newVersion} &mdash; the app will restart shortly&hellip;</span>
-            )}
           </div>
         </div>
       ) : (
@@ -111,47 +92,19 @@ function UpdatePanel(): React.JSX.Element {
 
       {available ? (
         <div className="field__row">
-          {busy ? (
-            <span className="field__hint">Starting download&hellip;</span>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => {
-                  setBusy(true)
-                  void api.updater.download().then(setStatus).catch(() => undefined)
-                }}
-              >
-                Download Update
-              </button>
-              <button type="button" className="btn btn--secondary" onClick={() => setStatus(null)}>
-                Later
-              </button>
-            </>
-          )}
-        </div>
-      ) : downloaded ? (
-        <div className="field__row">
-          {busy ? (
-            <span className="field__hint">Restarting&hellip;</span>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => {
-                  setBusy(true)
-                  void api.updater.install().then(setStatus).catch(() => undefined)
-                }}
-              >
-                Restart and Install
-              </button>
-              <button type="button" className="btn btn--secondary" onClick={() => setStatus(null)}>
-                Later
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => {
+              setBusy(true)
+              void api.updater.openReleases().finally(() => setBusy(false))
+            }}
+          >
+            {busy ? 'Opening…' : 'Download from GitHub'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={() => setStatus(null)}>
+            Later
+          </button>
         </div>
       ) : (
         <div className="field__row">
@@ -164,7 +117,7 @@ function UpdatePanel(): React.JSX.Element {
               void api.updater.check().then(setStatus).catch(() => undefined)
             }}
           >
-            {status?.state === 'checking' ? 'Checking&hellip;' : 'Check for Updates'}
+            {status?.state === 'checking' ? 'Checking…' : 'Check for Updates'}
           </button>
         </div>
       )}

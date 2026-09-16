@@ -26,15 +26,14 @@ Lifecycle:
 1. **Startup check** — 15 s after the app starts (and on request from the renderer), the
    main process asks electron-updater for the latest version.
 2. **Notify** — if a newer version exists, the renderer shows an **Update available** banner
-   (new version, current version, sanitized release notes) with **Update Now / Later**.
-3. **Download** — `Update Now` downloads the installer with a live progress bar. The download
-   is verified against the **sha512** hash published in `latest.yml` before it can be used.
-4. **Install** — `Restart & Update`:
-   - a **safety backup** of `database.db` is written to `backups/` first;
-   - the app quits, the NSIS installer silently replaces the application files;
-   - the app relaunches on the new version. Database migrations (if any) run automatically.
-5. **Up to date / error** — the banner confirms an up-to-date install or shows a helpful
-   error with a retry.
+   (new version, current version, sanitized release notes).
+3. **Download from GitHub** — the banner/panel action opens the GitHub releases page in the
+   system browser. The app itself never downloads, extracts, or runs installer binaries.
+4. **Install manually** — you download `Financial-Encoder-Setup-<version>.exe` from the releases
+   page (verified against the **sha512** published in `latest.yml`) and run it. The NSIS
+   installer replaces the application files; the database and user data are never touched.
+5. **Up to date / error** — the panel confirms an up-to-date install or shows a helpful error
+   with a retry.
 
 ## Versioning
 
@@ -138,29 +137,28 @@ artifacts above, then click **Publish release**.
 | 2 | Users install `Financial-Encoder-Setup-1.0.0.exe`. |
 | 3 | You bump to `1.0.1`, build, publish `v1.0.1`. |
 | 4 | Installed `1.0.0` app checks → sees `1.0.1` in `latest.yml` → banner. |
-| 5 | User downloads, restarts, app becomes 1.0.1. Database untouched. |
+| 5 | User opens the releases page, downloads, runs the installer, app becomes 1.0.1. Database untouched. |
 
 ## Integrity and security
 
 | Property | Guarantee |
 | --- | --- |
-| Transport | Updates are fetched over **HTTPS only** (GitHub Releases). |
-| Integrity | Every downloaded installer is verified against the **sha512** in `latest.yml` before it can run. |
+| Transport | Update checks go over **HTTPS only** (GitHub Releases). |
+| Integrity | Installers published to releases carry a **sha512** in `latest.yml`; comparisons happen against that published value. |
 | Feed pinning | The feed is baked into the app at build time; the renderer cannot change it. |
 | Env override | `FINANCIAL_ENCODER_UPDATE_FEED` is honoured only for testing and only for `https:` or `http://localhost` / `127.0.0.1`; other URLs are rejected. |
 | Dev safety | The updater is inert while `app.isPackaged === false` — dev runs never self-update. |
 | Downgrades | Disabled. |
-| Human gate | Nothing downloads or installs without the user clicking the banner action. |
+| Human gate | The app only **notifies**; the actual download and install require you to open the releases page and run the installer. Nothing ever runs from the app's own process. |
 
 ## User-data safety
 
 - The update only interacts with the **install directory** (`%LOCALAPPDATA%\Programs\...`).
 - The user-data folder (`C:\Users\<USER>\AppData\Roaming\FinancialEncoder\` — database,
-  backups, settings) is **never** touched or deleted by the updater.
-- Immediately before the app restarts to apply an update, `createBackup()` snapshots
-  `database.db` into `backups/` (visible in Settings → Backups).
-- If the new version ships schema changes, they are applied by the existing migration runner
-  on next launch; the pre-update backup remains available if a revert is ever needed.
+  backups, settings) is **never** touched or deleted by the updater or the installer.
+- If a new version ships schema changes, they are applied by the existing migration runner
+  on next launch. Backups created via Settings → Backups (or the portable `.febak` export)
+  remain available if a revert is ever needed.
 
 ## Rollback / recovery
 
@@ -194,21 +192,18 @@ artifacts above, then click **Publish release**.
 
 | # | Scenario | Expected result |
 | --- | --- | --- |
-| 1 | App at newest version, online | Banner briefly shows “You're up to date”, then disappears. |
+| 1 | App at newest version, online | Panel shows “No update is currently available.”; no banner. |
 | 2 | App older than feed | “Update available: vX (you have vY)” with sanitized release notes. |
-| 3 | “Later” on available | Banner hides; no download. No nag until a re-check. |
-| 4 | “Update Now” | Progress bar with %, transferred/total MB. |
-| 5 | Cancel mid-download (close app) | Resumes/restarts download next time; never applies partial file. |
-| 6 | Download completes | “Update ready — restart to install”. “Restart & Update” present. |
-| 7 | “Restart & Update” | Safety backup appears in Settings → Backups; app quits, installer runs, relaunches on new version. |
-| 8 | Offline / blocked feed | Error banner with friendly message + “Try again”. No crash. |
-| 9 | Corrupt/evil feed | sha512 mismatch → clear failure, old version stays, no data touched. |
-| 10 | `FINANCIAL_ENCODER_UPDATE_FEED=http://example.com` | Feed rejected (banner never appears); bad env ignored. |
-| 11 | Development (`npm run dev`) | No update code runs at all. |
-| 12 | Same version offered | Not shown (“You're up to date”). |
-| 13 | Release notes contain HTML | Rendered as plain text; tags stripped; length capped. |
-| 14 | Update with schema migration | Migrations run on next launch; data intact; backup available. |
-| 15 | Uninstall after updating | Uninstaller removes the app but keeps `AppData\Roaming\FinancialEncoder`. |
+| 3 | “Later” on available | Banner hides. No nag until a re-check. |
+| 4 | “Download from GitHub” | System browser opens the releases page; nothing downloaded by the app. |
+| 5 | Offline / blocked feed | Error/brief banner with friendly message + “Try again”. No crash. |
+| 6 | Corrupt/evil feed | Check fails gracefully; no download attempt; friendly error. |
+| 7 | `FINANCIAL_ENCODER_UPDATE_FEED=http://example.com` | Feed rejected (banner never appears); bad env ignored. |
+| 8 | Development (`npm run dev`) | No update code runs at all. |
+| 9 | Same version offered | Not shown (“You're up to date”). |
+| 10 | Release notes contain HTML | Rendered as plain text; tags stripped; length capped. |
+| 11 | Update with schema migration | Migrations run on next launch after installing manually; data intact. |
+| 12 | Uninstall after updating | Uninstaller removes the app but keeps `AppData\Roaming\FinancialEncoder`. |
 
 ## Troubleshooting
 
@@ -218,17 +213,18 @@ artifacts above, then click **Publish release**.
   re-check. The app previously built the installer but never published it.
 - **Banner never appears / not-available every time** — confirm the release is **finalized** on
   GitHub and that `latest.yml` inside it has a newer `version` than the installed app.
-- **Download fails partway** — retry from the banner; electron-updater resumes from its cache.
-- **sha512 mismatch** — `latest.yml` and the installer were from different builds. Rebuild and
-  re-upload both together.
-- **EPERM during `npm run dist`** — OneDrive lock; build with `FE_RELEASE_DIR` outside OneDrive
-  (see above).
 - **`spawn UNKNOWN` during `npm run release` (NSIS step)** — Smart App Control (or another
   Application Control policy) blocks the freshly-built, unsigned NSIS stub from executing to
   extract the uninstaller. **Do not disable SAC.** Either sign the build with a legitimate
   certificate (see `SIGNING.md`) or run the build where the policy does not apply — e.g. the
   included GitHub Actions **Release** workflow, which builds on a fresh Windows runner with no
   such policy.
+- **Update downloads but the installed app never advances (and eventually doesn't relaunch)** —
+  the app quits to apply an update, Smart App Control silently blocks the downloaded
+  **unsigned** installer from running (`Microsoft-Windows-CodeIntegrity/Operational` logs event
+  3033/3077), and the app never comes back. The remedy is to **sign the installers** and
+  configure `CSC_LINK_B64` in CI (see `SIGNING.md`). Since v1.0.5 this symptom cannot occur:
+  the app only notifies — it no longer quits to install anything on its own.
 - **Duplicate GitHub releases with the same tag after a CI publish** — electron-builder's
   publisher can race and create two releases with one tag (both look correct, but one ends up
   missing the installer/`latest.yml`). The **Release** workflow already guards against this:

@@ -1,5 +1,26 @@
 # Financial Encoder — Release Notes
 
+## v1.0.5 (September 16, 2026)
+
+### Updates
+
+- **Update notifications only — no silent auto-update.** The app now checks
+  GitHub for new versions and shows a banner ("Update available: …") with the
+  release notes and a button that opens the GitHub releases page in your
+  browser, where you download and run the installer yourself. The app never
+  downloads or installs anything in the background, so it can no longer
+  "disappear" while applying an update, and you stay in control of when
+  updates are installed.
+- **Optional Windows code signing in CI.** The release workflow now signs the
+  installer automatically when a `CSC_LINK_B64` code-signing certificate is
+  configured as a repository secret. Signed installers work with Windows Smart
+  App Control (which silently blocked the previous unsigned auto-update
+  installers). Without the secret the build stays unsigned, preserving the old
+  fallback. See `SIGNING.md` for setup.
+- **More reliable window startup.** A fallback now force-shows the main window
+  a few seconds after launch if the renderer is slow, so the app never sits
+  invisible behind the taskbar.
+
 ## v1.0.4 (September 16, 2026)
 
 ### Security
@@ -112,10 +133,9 @@ FinancialEncoder-Backup-2026-09-16.febak
 ### Automatic updates
 
 - Installed builds check for updates (GitHub Releases feed, HTTPS) shortly after launch and
-  show a banner when a newer version exists, with release notes, download progress and a
-  one-click restart to install.
-- Downloads are verified against the signed `latest.yml` **sha512** hash before use.
-- A **backup of your database is created automatically** immediately before an update applies;
-  the installer never touches your data folder
+  show a banner when a newer version exists, with release notes and a button that
+  opens the GitHub releases page to download the installer.
+- Downloads from the releases page are verified against the published **sha512** hash.
+- The installer never touches your data folder
   (`C:\Users\<USER>\AppData\Roaming\FinancialEncoder\`).
 - See `UPDATE_SYSTEM.md` for publishing, rollback and troubleshooting.

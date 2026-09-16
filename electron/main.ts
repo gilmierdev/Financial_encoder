@@ -78,9 +78,24 @@ function createMainWindow(): BrowserWindow {
     },
   })
 
-  window.once('ready-to-show', () => {
-    window.show()
-  })
+  // Fallback: if the renderer load is slow or stalls after an auto-update
+  // restart, force-show the window after a short delay so the app never
+  // remains invisible behind the taskbar.
+  let shown = false
+  let showTimer: ReturnType<typeof setTimeout> | null = null
+  const showWindow = () => {
+    if (!shown && window && !window.isDestroyed()) {
+      shown = true
+      if (showTimer) {
+        clearTimeout(showTimer)
+        showTimer = null
+      }
+      window.show()
+    }
+  }
+  window.once('ready-to-show', showWindow)
+  window.webContents.once('did-finish-load', showWindow)
+  showTimer = setTimeout(showWindow, 4000)
 
   window.webContents.on('did-finish-load', () => {
     logger.info('renderer loaded', {

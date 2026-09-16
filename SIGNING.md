@@ -33,6 +33,47 @@ npm run dist
 - Never commit the certificate or the password to Git. Keep them in your CI
   secrets (GitHub Actions, GitLab CI, Jenkins, etc.).
 
+## Sign unattended in GitHub Actions (recommended)
+
+The release workflow (`.github/workflows/release.yml`) signs the installer
+automatically when these two repository secrets are configured. If they are
+missing, the workflow builds an unsigned installer exactly as before — signing
+is a drop-in addition, not a requirement.
+
+1. Base64-encode your `.pfx` file (PowerShell):
+
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\secure\financial-encoder.pfx"))
+   ```
+
+2. In GitHub, open **Repository → Settings → Secrets and variables →
+   Actions → New repository secret**, then add:
+
+   | Secret name           | Value                                            |
+   | --------------------- | ------------------------------------------------ |
+   | `CSC_LINK_B64`        | the base64 string from step 1                    |
+   | `CSC_KEY_PASSWORD`    | your certificate password                        |
+
+3. Push a version tag (`v1.0.5`) as usual. The workflow decodes
+   `CSC_LINK_B64` into a temporary `.pfx` on the runner, sets `CSC_LINK` /
+   `CSC_KEY_PASSWORD` for the electron-builder step, and deletes the file
+   afterwards.
+
+The certificate never touches the repository — it only exists as environment
+variables inside the runner and is masked in the logs.
+
+### Verify in the workflow log
+
+The final "Verify installer signature" step prints, for the published setup:
+
+```
+Signature status: Valid
+Signer: CN=..., O=..., C=...
+```
+
+It does not fail the job if the build was unsigned (so unsigned fallback keeps
+working), it only reports the status.
+
 ## Sign with Azure Trusted Signing
 
 Provide these environment variables instead:

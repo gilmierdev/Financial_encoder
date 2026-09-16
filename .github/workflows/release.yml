@@ -39,6 +39,25 @@ jobs:
       - name: Type-check and test
         run: npm run typecheck && npm test
 
+      # Code signing (optional). If the CSC_LINK_B64 secret is set, the PFX is
+      # decoded into a temp file and CSC_LINK/CSC_KEY_PASSWORD tell
+      # electron-builder to sign the installer. Without it the build stays
+      # unsigned (current behaviour). No certificate is stored in the repo.
+      - name: Decode signing certificate
+        shell: pwsh
+        env:
+          CSC_LINK_B64: ${{ secrets.CSC_LINK_B64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK_B64)) {
+            Write-Host "No CSC_LINK_B64 secret set - building unsigned"
+          } else {
+            $bytes = [Convert]::FromBase64String($env:CSC_LINK_B64)
+            $pfxPath = Join-Path $env:RUNNER_TEMP "financial-encoder-signing.pfx"
+            [IO.File]::WriteAllBytes($pfxPath, $bytes)
+            Write-Host "CSC_LINK=$pfxPath" >> $env:GITHUB_ENV
+            Write-Host "Decoded signing certificate ($($bytes.Length) bytes) to $pfxPath"
+          }
+
       # electron-builder can race and create two releases with the same tag
       # (two parallel publisher instances). Make publishing deterministic:
       # delete any stale duplicates for this tag, then pre-create the single
@@ -79,3 +98,27 @@ jobs:
         run: npm run release:publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      # Remove the certificate from the runner once the build is done.
+      - name: Cleanup signing certificate
+        if: always()
+        shell: pwsh
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "financial-encoder-signing.pfx"
+          if (Test-Path $pfxPath) {
+            Remove-Item $pfxPath -Force
+            Write-Host "Removed signing certificate"
+          }
+
+      - name: Verify installer signature
+        if: always()
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "release" -Filter "Financial-Encoder-Setup-*.exe" | Select-Object -First 1
+          if ($setup) {
+            $sig = Get-AuthenticodeSignature $setup.FullName
+            Write-Host "Setup: $($setup.Name)"
+            Write-Host "Signature status: $($sig.Status)"
+            Write-Host "Signer: $($sig.SignerCertificate.Subject)"
+          }
