@@ -229,5 +229,10 @@ artifacts above, then click **Publish release**.
   certificate (see `SIGNING.md`) or run the build where the policy does not apply — e.g. the
   included GitHub Actions **Release** workflow, which builds on a fresh Windows runner with no
   such policy.
+- **Duplicate GitHub releases with the same tag after a CI publish** — electron-builder's
+  publisher can race and create two releases with one tag (both look correct, but one ends up
+  missing the installer/`latest.yml`). The **Release** workflow already guards against this:
+  it deletes stale same-tag releases, pre-creates exactly one target release, and let
+  electron-builder only upload into it.
 - **Updater logs** — everything is written to `logs/` in the user-data folder and mirrored to the
   console in dev.
