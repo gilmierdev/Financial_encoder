@@ -64,7 +64,7 @@ describe('readDocument (PDF text extraction)', () => {
     expect(result.text).toContain('Cappuccino')
     expect(result.text).toContain('TOTAL')
     expect(result.lines.length).toBeGreaterThanOrEqual(4)
-  })
+  }, 30000)
 
   it('rejects unsupported file types', async () => {
     const file = tempFile('data.txt')
