@@ -1,5 +1,17 @@
 # Financial Encoder — Release Notes
 
+## v1.0.3 (September 16, 2026)
+
+### Fixes
+
+- **No more "You're up to date" banner on every launch.** The app now stays
+  quiet when it is already on the latest version; the up-to-date status is
+  still shown in **Settings → Updates** when checking manually.
+
+## v1.0.2 (September 16, 2026)
+
+Automatically-published release built from the configured CI pipeline.
+
 ## v1.0.1 (September 16, 2026)
 
 Automatic-update system made live.

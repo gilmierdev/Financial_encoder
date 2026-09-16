@@ -30,7 +30,7 @@ function UpdateBanner(): React.JSX.Element | null {
       if (next.state === 'available' || next.state === 'downloaded' || next.state === 'error') {
         setDismissed(false)
       }
-      if (next.state === 'not-available' || next.state === 'check-failed') {
+      if (next.state === 'check-failed') {
         setDismissed(false)
         setBriefVisible(true)
         window.clearTimeout(briefTimer.current)
@@ -48,16 +48,10 @@ function UpdateBanner(): React.JSX.Element | null {
     return null
   }
 
+  // No banner when the app is already up to date — that is silently fine and
+  // is reported in Settings → Updates instead of being flashed on every launch.
   if (status.state === 'not-available') {
-    if (!briefVisible) {
-      return null
-    }
-    return (
-      <div className="update-banner update-banner--ok" role="status">
-        <Icon name="update" size={16} />
-        <span>You&rsquo;re up to date &mdash; Financial Encoder {status.currentVersion}</span>
-      </div>
-    )
+    return null
   }
 
   if (status.state === 'check-failed') {
