@@ -10,10 +10,10 @@ embeds an `app-update.yml` that points at the release feed:
 
 ```yaml
 owner: gilmierdev
-repo: financial-encoder
+repo: financial_encoder
 provider: github
 releaseType: draft
-updaterCacheDirName: financial-encoder-updater
+updaterCacheDirName: financial_encoder-updater
 ```
 
 Lifecycle:
@@ -73,7 +73,7 @@ Notes:
 
 ## Publish an update (GitHub Releases)
 
-The updater downloads from the latest **GitHub Release** of `gilmierdev/financial-encoder`.
+The updater downloads from the latest **GitHub Release** of `gilmierdev/financial_encoder`.
 To ship a new version to users:
 
 1. Bump `version` in `package.json`.

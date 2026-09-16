@@ -289,7 +289,7 @@ is supplied):
 attack surface narrow:
 
 - Updates are fetched **over HTTPS only** from GitHub Releases (owner `gilmierdev`, repo
-  `financial-encoder`); an env-only feed override for local testing is restricted to HTTPS or
+  `financial_encoder`); an env-only feed override for local testing is restricted to HTTPS or
   `http://localhost`/`127.0.0.1` — arbitrary/insecure URLs are rejected (`validateFeed` in
   `electron/updater/update-meta.ts`).
 - Binary integrity is verified with the **sha512** hashes published in `latest.yml`

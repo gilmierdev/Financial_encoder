@@ -81,6 +81,7 @@ function Expenses(): React.JSX.Element {
       types: ['expense'],
       ...(range.date_from ? { date_from: range.date_from } : {}),
       ...(range.date_to ? { date_to: range.date_to } : {}),
+      ...(categoryFilter ? { category_ids: [Number(categoryFilter)] } : {}),
     }
 
     const txFilters: TransactionFilters = {

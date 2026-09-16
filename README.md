@@ -12,7 +12,7 @@ A **local / offline** financial encoding and analysis desktop application for Wi
 ## Project structure
 
 ```
-financial-encoder/
+financial_encoder/
 ├── electron/            # Main process + preload (CommonJS, compiled by tsc)
 │   ├── main.ts          # BrowserWindow, secure settings, IPC handler registration
 │   ├── preload.ts       # contextBridge API exposed to React

@@ -78,7 +78,7 @@ module.exports = {
     {
       provider: 'github',
       owner: 'gilmierdev',
-      repo: 'financial-encoder',
+      repo: 'financial_encoder',
       releaseType: 'draft',
       // HTTPS is always used; electron-builder refuses "http" for GitHub.
     },

@@ -1,10 +1,10 @@
 {
-  "name": "financial-encoder",
+  "name": "financial_encoder",
   "version": "1.0.0",
   "description": "Financial Encoder — a local/offline financial encoding and analysis desktop application for Windows.",
   "main": "dist-electron/main.js",
   "author": "GilmierDev",
-  "homepage": "https://github.com/gilmierdev/financial-encoder",
+  "homepage": "https://github.com/gilmierdev/financial_encoder",
   "license": "MIT",
   "private": true,
   "scripts": {

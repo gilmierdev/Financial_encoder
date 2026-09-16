@@ -60,7 +60,7 @@ This document describes the security model, what is protected, and how to report
 ## Reporting a vulnerability
 
 Please report security issues privately to the maintainer (GitHub
-<https://github.com/gilmierdev/financial-encoder>) rather than opening a public issue. Include a
+<https://github.com/gilmierdev/financial_encoder>) rather than opening a public issue. Include a
 description of the issue, the version, and repro steps. We treat self-XSS, renderer-only issues
 behind `contextIsolation`, and local-file attacks that require physical access to the machine as
 lower severity.
