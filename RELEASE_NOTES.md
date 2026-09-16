@@ -1,5 +1,13 @@
 # Financial Encoder — Release Notes
 
+## v1.0.4 (September 16, 2026)
+
+### Security
+
+- **Patched two moderate `uuid` vulnerabilities** inherited through `exceljs`
+  (missing buffer bounds check in uuid `v3`/`v5`/`v6`). `npm audit` now reports
+  `0 vulnerabilities`, and Excel import/export still passes all tests.
+
 ## v1.0.3 (September 16, 2026)
 
 ### Fixes

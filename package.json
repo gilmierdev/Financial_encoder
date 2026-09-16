@@ -1,12 +1,15 @@
 {
   "name": "financial_encoder",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Financial Encoder — a local/offline financial encoding and analysis desktop application for Windows.",
   "main": "dist-electron/main.js",
   "author": "GilmierDev",
   "homepage": "https://github.com/gilmierdev/financial_encoder",
   "license": "MIT",
   "private": true,
+  "overrides": {
+    "uuid": ">=11.1.1"
+  },
   "scripts": {
     "dev": "concurrently -k -n RENDERER,ELECTRON -c cyan,green \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite",
