@@ -19,7 +19,7 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +35,32 @@ jobs:
 
       - name: Rebuild native modules for Electron
         run: npx electron-builder install-app-deps
+
+      # Bundle the offline PaddleOCR runtime + models into the installer. The
+      # runtime is a git-ignored build artifact provisioned at build time; without
+      # this step the packaged app would fall back to tesseract.js for OCR.
+      - name: Cache PaddleOCR runtime and models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ocr-runtime
+            ocr-sidecar/models
+          key: ocr-runtime-${{ runner.os }}-${{ hashFiles('scripts/setup-ocr-runtime.ps1') }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+
+      - name: Provision PaddleOCR runtime (offline OCR)
+        run: npm run ocr:setup
+
+      - name: Verify PaddleOCR runtime
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "ocr-runtime/python.exe")) { throw "ocr-runtime/python.exe missing" }
+          if (-not (Test-Path "ocr-sidecar/models")) { throw "OCR models missing" }
+          Write-Host "PaddleOCR runtime and models present."
 
       - name: Type-check and test
         run: npm run typecheck && npm test
