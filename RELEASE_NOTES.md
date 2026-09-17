@@ -1,5 +1,16 @@
 # Financial Encoder — Release Notes
 
+## v1.0.10 (September 18, 2026)
+
+### Reliability
+
+- **Hardened release pipeline.** The installer is fully built and verified
+  (`.exe`, checksum blockmap and update feed) before anything is published, and
+  the release becomes public only after all files have finished uploading. A
+  failed or interrupted build can no longer leave an empty release that would
+  block updates, and any duplicate release for the same version is cleaned up
+  automatically.
+
 ## v1.0.9 (September 18, 2026)
 
 ### Updates

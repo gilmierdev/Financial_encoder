@@ -1,6 +1,6 @@
 {
   "name": "financial_encoder",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Financial Encoder — financial management and encoding desktop application.",
   "main": "dist-electron/main.js",
   "author": "Gilmier Ej Cabil <gilmier.ej.cabil.dev@gmail.com> (https://github.com/gilmierdev)",
