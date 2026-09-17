@@ -84,47 +84,53 @@ jobs:
             Write-Host "Decoded signing certificate ($($bytes.Length) bytes) to $pfxPath"
           }
 
-      # electron-builder can race and create two releases with the same tag
-      # (two parallel publisher instances). Make publishing deterministic:
-      # delete any stale duplicates for this tag, then pre-create the single
-      # target release so electron-builder only ever uploads into it.
-      - name: Remove stale releases for this tag
-        shell: pwsh
+      # Build and package only. The release is created and published in a later
+      # step so that a failed build (or upload) can never leave an empty,
+      # published release that breaks auto-update for every installed app.
+      - name: Build and package installer
+        run: npm run release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $token = $env:GITHUB_TOKEN
-          $h = @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
-          $rels = Invoke-RestMethod -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
-          $stale = $rels | Where-Object { $_.tag_name -eq $env:GITHUB_REF_NAME }
-          foreach ($r in $stale) {
-            Invoke-RestMethod -Method Delete -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($r.id)"
-            Write-Host "deleted stale release id $($r.id)"
-          }
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
-      - name: Pre-create the target release
+      - name: Verify release artifacts
         shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $token = $env:GITHUB_TOKEN
-          $h = @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
-          $existing = $null
-          try { $existing = Invoke-RestMethod -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:GITHUB_REF_NAME" } catch { }
-          if ($null -eq $existing) {
-            $notes = Get-Content -Raw RELEASE_NOTES.md
-            $body = @{ tag_name = $env:GITHUB_REF_NAME; name = $env:GITHUB_REF_NAME; body = $notes } | ConvertTo-Json
-            Invoke-RestMethod -Method Post -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases" -Body $body
-            Write-Host "pre-created release $env:GITHUB_REF_NAME"
-          } else {
-            Write-Host "release $env:GITHUB_REF_NAME already exists"
-          }
+          $setup = Get-ChildItem "release" -Filter "Financial-Encoder-Setup-*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $blockmap = Get-ChildItem "release" -Filter "*.exe.blockmap" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $latest = Join-Path "release" "latest.yml"
+          if (-not $setup) { throw "Installer (.exe) was not produced." }
+          if (-not $blockmap) { throw "Blockmap was not produced." }
+          if (-not (Test-Path $latest)) { throw "latest.yml was not produced." }
+          Write-Host "Artifacts:"
+          Write-Host "  $($setup.Name) ($($setup.Length) bytes)"
+          Write-Host "  $($blockmap.Name) ($($blockmap.Length) bytes)"
+          Write-Host "  latest.yml ($((Get-Item $latest).Length) bytes)"
 
-      - name: Build, package and publish to GitHub Releases
-        run: npm run release:publish
+      # Publish with gh instead of electron-builder's own publisher, which can
+      # race and create duplicate releases for one tag. The release is created
+      # as a draft, assets are uploaded, and only then is it published - so an
+      # upload failure stays invisible to the updater instead of breaking it.
+      - name: Publish GitHub release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          if ($env:GITHUB_REF_TYPE -ne 'tag') {
+            throw "The Publish step requires a version tag (got ref type '$env:GITHUB_REF_TYPE'). Push a vX.Y.Z tag to release."
+          }
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Removing existing release for $tag"
+            gh release delete $tag --yes
+          }
+          $assets = @()
+          $assets += (Get-ChildItem "release" -Filter "Financial-Encoder-Setup-*.exe").FullName
+          $assets += (Get-ChildItem "release" -Filter "*.exe.blockmap").FullName
+          $assets += (Resolve-Path "release/latest.yml").Path
+          gh release create $tag @assets --draft --title $tag --notes-file RELEASE_NOTES.md
+          gh release edit $tag --draft=false --latest
+          Write-Host "Published release $tag"
 
       # Remove the certificate from the runner once the build is done.
       - name: Cleanup signing certificate
