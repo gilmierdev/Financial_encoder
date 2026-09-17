@@ -8,6 +8,9 @@
   Investment* category, capital transactions can now be recorded under *Other
   Investor*. A database migration adds it automatically to existing installs,
   and fresh installs get it from the default seed.
+- **Update banner only on the Settings page.** The update notification banner
+  no longer appears on every screen; it is shown only in **Settings**, so other
+  pages stay clean.
 
 ## v1.0.7 (September 17, 2026)
 
