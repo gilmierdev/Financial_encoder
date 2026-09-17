@@ -4,6 +4,11 @@
 //   Default: <project>/release/
 //   Override: FE_RELEASE_DIR=<path> npm run dist
 //
+// Publisher identity (shown to Windows users in the installer/app details):
+//   Company name : Gilmier Ej Cabil
+//   Product name : Financial Encoder
+//   Copyright    : Copyright © 2026 Gilmier Ej Cabil
+//
 // Code signing (optional but strongly recommended for distribution):
 //   electron-builder reads the standard environment variables below; no
 //   certificate is ever committed to the repository.
@@ -15,7 +20,8 @@
 //   To add an Azure Trusted Signing endpoint instead, provide:
 //     AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_CERT_NAME
 //
-//   See SIGNING.md for the full guide.
+//   Production releases must be signed: use `npm run release:signed`, which
+//   fails fast when CSC_LINK / CSC_KEY_PASSWORD are missing. See SIGNING.md.
 //
 const path = require('path')
 
@@ -24,7 +30,7 @@ const outputDir = process.env.FE_RELEASE_DIR || path.join(__dirname, 'release')
 module.exports = {
   appId: 'com.financialencoder.app',
   productName: 'Financial Encoder',
-  copyright: 'Copyright © 2026 Financial Encoder',
+  copyright: 'Copyright © 2026 Gilmier Ej Cabil',
   directories: {
     output: outputDir,
     buildResources: 'build',
@@ -36,7 +42,12 @@ module.exports = {
     'node_modules/better-sqlite3/**/*',
     'node_modules/@napi-rs/**/*',
   ],
-  extraResources: [{ from: 'resources/ocr', to: 'ocr' }],
+  extraResources: [
+    { from: 'resources/ocr', to: 'ocr' },
+    // PaddleOCR sidecar script + offline models, and the standalone Python runtime.
+    { from: 'ocr-sidecar', to: 'ocr-paddle', filter: ['**/*', '!**/__pycache__/**'] },
+    { from: 'ocr-runtime', to: 'ocr-paddle/python' },
+  ],
   compression: 'maximum',
   win: {
     target: [
@@ -50,6 +61,13 @@ module.exports = {
     // Produces a clean executable/installer that can later be signed with a
     // legitimate certificate (see CSC_LINK above). Defaults to true.
     signAndEditExecutable: true,
+    // Windows publisher metadata (CompanyName in the file version info).
+    legalTrademarks: 'Financial Encoder',
+    signtoolOptions: {
+      // The publisher name must match the certificate subject exactly when
+      // signing. Used by the update signature verification once signed.
+      publisherName: 'Gilmier Ej Cabil',
+    },
   },
   publish: [
     {

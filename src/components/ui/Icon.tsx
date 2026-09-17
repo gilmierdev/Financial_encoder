@@ -13,6 +13,15 @@ export type IconName =
   | 'settings'
   | 'search'
   | 'update'
+  | 'globe'
+  | 'calendar'
+  | 'palette'
+  | 'sun'
+  | 'moon'
+  | 'monitor'
+  | 'archive'
+  | 'info'
+  | 'shield'
 
 const PATHS: Record<IconName, ReactNode> = {
   dashboard: (
@@ -92,6 +101,73 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="11" cy="11" r="7" />
       <path d="m21 21-4.35-4.35" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14.5 14.5 0 0 1 0 18 14.5 14.5 0 0 1 0-18" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <path d="M3 9h18" />
+    </>
+  ),
+  palette: (
+    <>
+      <path d="M12 3a9 9 0 0 0 0 18c1 0 1.6-.8 1.4-1.6-.2-.8.3-1.4 1.1-1.4H16a5 5 0 0 0 5-5c0-5.5-4-10-9-10Z" />
+      <circle cx="7.5" cy="10.5" r="0.6" />
+      <circle cx="10" cy="7" r="0.6" />
+      <circle cx="14" cy="7" r="0.6" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2v2.5" />
+      <path d="M12 19.5V22" />
+      <path d="M4.9 4.9l1.8 1.8" />
+      <path d="M17.3 17.3l1.8 1.8" />
+      <path d="M2 12h2.5" />
+      <path d="M19.5 12H22" />
+      <path d="m4.9 19.1 1.8-1.8" />
+      <path d="m17.3 6.7 1.8-1.8" />
+    </>
+  ),
+  moon: (
+    <path d="M12 3a9 9 0 1 0 9 9c-4.1 0-8-3-8-9Z" />
+  ),
+  monitor: (
+    <>
+      <rect x="2.5" y="4" width="19" height="13" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+    </>
+  ),
+  archive: (
+    <>
+      <rect x="3" y="4" width="18" height="5" rx="1.5" />
+      <path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
+      <path d="M10 13h4" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 8h.01" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3 5 6v5c0 4.5 3 7.6 7 9.5 4-1.9 7-5 7-9.5V6l-7-3Z" />
+      <path d="M12 8v4" />
+      <path d="M12 15h.01" />
     </>
   ),
 }

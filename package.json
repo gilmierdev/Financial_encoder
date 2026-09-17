@@ -1,9 +1,9 @@
 {
   "name": "financial_encoder",
-  "version": "1.0.8",
-  "description": "Financial Encoder — a local/offline financial encoding and analysis desktop application for Windows.",
+  "version": "1.0.9",
+  "description": "Financial Encoder — financial management and encoding desktop application.",
   "main": "dist-electron/main.js",
-  "author": "GilmierDev",
+  "author": "Gilmier Ej Cabil <gilmier.ej.cabil.dev@gmail.com> (https://github.com/gilmierdev)",
   "homepage": "https://github.com/gilmierdev/financial_encoder",
   "license": "MIT",
   "private": true,
@@ -26,6 +26,9 @@
     "dist:dir": "npm run build && electron-builder --dir --config electron-builder.config.js",
     "release": "npm run build && electron-builder --config electron-builder.config.js --publish never",
     "release:publish": "npm run build && electron-builder --config electron-builder.config.js --publish always",
+    "release:signed": "node scripts/require-signing.js && npm run release",
+    "verify:windows-signature": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-windows-signature.ps1",
+    "ocr:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-ocr-runtime.ps1",
     "electron:build": "npm run dist",
     "electron:dev": "npm run dev"
   },

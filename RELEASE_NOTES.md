@@ -1,5 +1,28 @@
 # Financial Encoder — Release Notes
 
+## v1.0.9 (September 18, 2026)
+
+### Updates
+
+- **All-time view by default.** Dashboard, Income, Capital, Expenses and
+  Reports now open on **All Time** instead of the current month, so your totals
+  and lists show your full history as soon as the page loads. Cash Flow already
+  behaved this way. The period buttons still let you switch to This Month, Last
+  3 Months, This Year or a custom range at any time.
+- **New offline OCR engine (PaddleOCR).** Document and image recognition now
+  uses a bundled PaddleOCR PP-OCRv6 engine running fully offline, which reads
+  receipts, bills, screenshots and scanned PDFs more accurately. If the engine
+  is ever unavailable the app automatically falls back to the previous
+  tesseract.js reader, so OCR always works.
+
+### Fixes
+
+- **Much better bill and receipt parsing.** GCash bill-payment screenshots are
+  now recognised as a single bill-payment entry (biller and total amount), and
+  bill documents capture their amount due and due date. Dates are normalised to
+  a consistent format and reference numbers, phone numbers and stray short
+  numbers are no longer mistaken for amounts.
+
 ## v1.0.8 (September 17, 2026)
 
 ### Updates

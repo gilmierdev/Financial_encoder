@@ -30,7 +30,7 @@ function Dashboard(): React.JSX.Element {
   const currencyCode = settings?.currency ?? 'PHP'
   const dateFormat = settings?.dateFormat ?? 'YYYY-MM-DD'
 
-  const [period, setPeriod] = useState<PeriodKey>('this-month')
+  const [period, setPeriod] = useState<PeriodKey>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 

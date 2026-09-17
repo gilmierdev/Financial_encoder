@@ -1,6 +1,6 @@
 # Financial Encoder
 
-A **local / offline** financial encoding and analysis desktop application for Windows.
+A **local / offline** financial encoding and analysis desktop application for Windows, developed by **Gilmier Ej Cabil**.
 
 - **Stack:** Electron · React · TypeScript · Vite · SCSS · SQLite (better-sqlite3) · electron-builder
 - **Security:** `contextIsolation: true`, `nodeIntegration: false`, sandboxed renderer, secure preload bridge, IPC-only access
@@ -43,7 +43,9 @@ financial_encoder/
 | `npm run dist` | Clean build + package the Windows installer (`release/`) |
 | `npm run dist:dir` | Build + create `release/win-unpacked` only (no installer) |
 | `npm run release` | Build + package installer + `latest.yml` + blockmap (no upload) |
+| `npm run release:signed` | Same as `release`, but **fails fast** if no code-signing certificate is provided (`CSC_LINK` / `CSC_KEY_PASSWORD`) |
 | `npm run release:publish` | Same as release, then create a **published** GitHub Release (`GH_TOKEN` required) |
+| `npm run verify:windows-signature` | Verify the Authenticode signature of the built installer (SmartScreen / trust check) |
 | `npm run typecheck` | Type-check both TypeScript projects |
 | `npm run lint` | Type-check (uses the same strict configs) |
 | `npm test` | Run the unit test suite (Vitest) |
@@ -98,12 +100,57 @@ The dev workflow runs three processes together:
 In production (installed app), Electron loads `dist-renderer/index.html` from
 disk — no development environment is required on the user's machine.
 
-## Code signing
+## Code signing & SmartScreen
 
-Signing is configured but no certificate is committed to the repository. See
-`SIGNING.md` for how to attach a legitimate certificate via `CSC_LINK` /
-`CSC_KEY_PASSWORD` (or Azure Trusted Signing) in CI. Do not bypass Smart
-App Control, SmartScreen, Defender or UAC — sign legitimately instead.
+Windows may show a warning when running an application downloaded from the
+internet. That warning is decided by **SmartScreen**, which considers two
+different things:
+
+1. **Code signing** (Authenticode) — a digital certificate proving *who*
+   published the file. This is **not** the same as reputation.
+2. **Reputation** — how many people have run the file or installer and how
+   Windows (and other antivirus engines) currently rate it.
+
+Signing Financial Encoder with a legitimate certificate tells users *who*
+published it and removes the "unknown publisher" warning, but it does **not**
+by itself guarantee SmartScreen will not prompt ("Windows protected your PC").
+A newly signed, rarely-downloaded file can still be flagged until it builds
+reputation. The correct response is to distribute the signed installer through
+a trusted channel and keep building download volume — never to disable
+SmartScreen, App Control, Defender or UAC.
+
+**Publisher identity:** `Financial Encoder © 2026 Gilmier Ej Cabil` is embedded
+in the installer metadata and the About section of the app.
+
+### Signing is configured but no certificate is committed
+
+No certificate or password is stored in this repository. electron-builder reads
+the standard environment variables:
+
+```
+SET CSC_LINK=C:\secure\financial-encoder.pfx
+SET CSC_KEY_PASSWORD=your-secure-password
+npm run release:signed
+```
+
+Or, for Azure Trusted Signing:
+
+```
+SET AZURE_TENANT_ID=...
+SET AZURE_CLIENT_ID=...
+SET AZURE_CLIENT_SECRET=...
+SET AZURE_CERT_NAME=...
+npm run release:signed
+```
+
+- `npm run release:signed` refuses to build a production installer when the
+  signing credentials are missing (see `scripts/require-signing.js`).
+- `npm run dist` / `npm run release` still work **unsigned** for local testing.
+- `npm run verify:windows-signature` inspects the built installer with
+  `Get-AuthenticodeSignature` and reports publisher, validity and PASS/FAIL.
+
+See `SIGNING.md` for the complete guide (why, what you need, CI secrets, and
+troubleshooting).
 
 ## Release notes & user guide
 

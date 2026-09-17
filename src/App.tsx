@@ -5,6 +5,7 @@ import { SettingsProvider } from './contexts/SettingsContext'
 import { api, ApiError } from './services/api'
 import { installGlobalErrorForwarding, logToMain } from './services/logger'
 import AppShell from './components/layout/AppShell'
+import { DEFAULT_SETTINGS_PATH } from './pages/Settings/settingsSections'
 
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions/Transactions'))
@@ -15,7 +16,12 @@ const CashFlow = lazy(() => import('./pages/CashFlow/CashFlow'))
 const Reports = lazy(() => import('./pages/Reports/Reports'))
 const Import = lazy(() => import('./pages/Import/Import'))
 const Documents = lazy(() => import('./pages/Documents/Documents'))
-const Settings = lazy(() => import('./pages/Settings/Settings'))
+const SettingsGeneral = lazy(() => import('./pages/Settings/SettingsGeneral'))
+const SettingsAppearance = lazy(() => import('./pages/Settings/SettingsAppearance'))
+const SettingsUpdates = lazy(() => import('./pages/Settings/SettingsUpdates'))
+const SettingsBackups = lazy(() => import('./pages/Settings/SettingsBackups'))
+const SettingsAbout = lazy(() => import('./pages/Settings/SettingsAbout'))
+const SettingsDanger = lazy(() => import('./pages/Settings/SettingsDanger'))
 
 type BootstrapState =
   | { status: 'loading' }
@@ -100,7 +106,13 @@ function App(): React.JSX.Element {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/documents" element={<Documents />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<Navigate to={DEFAULT_SETTINGS_PATH} replace />} />
+                <Route path="/settings/general" element={<SettingsGeneral />} />
+                <Route path="/settings/appearance" element={<SettingsAppearance />} />
+                <Route path="/settings/updates" element={<SettingsUpdates />} />
+                <Route path="/settings/backups" element={<SettingsBackups />} />
+                <Route path="/settings/about" element={<SettingsAbout />} />
+                <Route path="/settings/danger" element={<SettingsDanger />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Routes>

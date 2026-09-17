@@ -35,19 +35,14 @@ function UpdatePanel(): React.JSX.Element {
 
   if (status.state === 'unsupported') {
     return (
-      <section className="card">
-        <h2 className="card__title">Updates</h2>
-        <p className="chart-empty" style={{ margin: 0 }}>
-          Auto-update is only available in the installed production version.
-        </p>
-      </section>
+      <p className="chart-empty" style={{ margin: 0 }}>
+        Auto-update is only available in the installed production version.
+      </p>
     )
   }
 
   return (
-    <section className="card">
-      <h2 className="card__title">Updates</h2>
-
+    <>
       {status.state === 'checking' && (
         <div className="update-panel__status">
           <div className="spinner" aria-label="Checking for updates" />
@@ -135,7 +130,7 @@ function UpdatePanel(): React.JSX.Element {
           </button>
         </div>
       )}
-    </section>
+    </>
   )
 }
 

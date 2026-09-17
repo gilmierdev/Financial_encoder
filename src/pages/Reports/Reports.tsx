@@ -25,7 +25,7 @@ function Reports(): React.JSX.Element {
   const { settings } = useSettings()
   const currencyCode = settings?.currency ?? 'PHP'
 
-  const [period, setPeriod] = useState<PeriodKey>('this-month')
+  const [period, setPeriod] = useState<PeriodKey>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 

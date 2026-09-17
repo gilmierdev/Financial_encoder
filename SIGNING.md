@@ -21,15 +21,19 @@ A Windows code-signing certificate. Common options:
 
 ## Sign with a .pfx certificate
 
-`electron-builder` reads standard environment variables automatically:
+`electron-builder` reads standard environment variables automatically and
+`npm run release:signed` refuses to build a production installer when they are
+missing:
 
 ```
 SET CSC_LINK=C:\secure\financial-encoder.pfx
 SET CSC_KEY_PASSWORD=your-secure-password
-npm run dist
+npm run release:signed
 ```
 
 - `CSC_LINK` may also be an `https:` URL or a base64 `data:` URL (handy in CI).
+- `npm run dist` / `npm run release` still produce **unsigned** installers for
+  local testing. Only `release:signed` enforces signing.
 - Never commit the certificate or the password to Git. Keep them in your CI
   secrets (GitHub Actions, GitLab CI, Jenkins, etc.).
 
@@ -83,7 +87,7 @@ AZURE_TENANT_ID=...
 AZURE_CLIENT_ID=...
 AZURE_CLIENT_SECRET=...
 AZURE_CERT_NAME=...
-npm run dist
+npm run release:signed
 ```
 
 ## What signing does not guarantee
@@ -101,13 +105,27 @@ Recommended distribution path:
 
 ## Verifying the output
 
-After a signed build, check the signature (PowerShell):
+After a signed build, check the signature:
 
 ```powershell
-Get-AuthenticodeSignature "release\Financial-Encoder-Setup-1.0.0.exe"
+npm run verify:windows-signature
 ```
 
-Status should be `Valid`.
+This runs `scripts\verify-windows-signature.ps1`, which uses
+`Get-AuthenticodeSignature` against the newest installer in `release\` and
+prints the publisher, validity range and a PASS / FAIL conclusion. Point it at
+a specific file with `-Path`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-windows-signature.ps1 -Path .\release\Financial-Encoder-Setup-1.0.8.exe
+```
+
+Status should be `Valid` and the publisher should match your certificate
+(signing config targets **Gilmier Ej Cabil** / Financial Encoder © 2026).
+
+> Note: the current installers in `release/` are **unsigned** (no certificate
+> has been supplied), so the script will report `Status: NOT SIGNED`. That is
+> expected until a real certificate is wired up.
 
 ## Troubleshooting
 

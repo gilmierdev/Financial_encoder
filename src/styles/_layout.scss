@@ -128,6 +128,9 @@
 .sidebar__footer {
   padding: 14px 18px;
   border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .sidebar__foot-label {
@@ -138,6 +141,11 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
+  color: var(--text-faint);
+}
+
+.sidebar__credit {
+  font-size: 11px;
   color: var(--text-faint);
 }
 
@@ -217,7 +225,6 @@
 .topbar__search:focus-within {
   border-color: var(--accent);
   background: var(--bg-surface);
-  box-shadow: var(--focus-ring);
   color: var(--accent);
 }
 
@@ -233,6 +240,15 @@
   outline: none;
   background: transparent;
   color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none;
+}
+
+.topbar__search-input:focus {
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 .topbar__search-input::placeholder {

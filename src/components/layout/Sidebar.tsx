@@ -34,6 +34,7 @@ function Sidebar(): React.JSX.Element {
 
       <div className="sidebar__footer">
         <span className="sidebar__foot-label">Local / Offline</span>
+        <span className="sidebar__credit">Built &amp; developed by GilmierDev</span>
       </div>
     </nav>
   )

@@ -7,6 +7,12 @@ release/
 .env
 .env.local
 .env.*
+
+# PaddleOCR runtime & models (provisioned locally, bundled at build time)
+ocr-runtime/
+ocr-sidecar/models/
+ocr-sidecar/**/__pycache__/
+ocr-sidecar/**/*.pyc
 !.env.example
 
 # Secrets & credentials
