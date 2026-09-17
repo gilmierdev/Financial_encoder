@@ -25,6 +25,7 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
   { name: 'Other Expense', type: 'expense' },
   // Capital
   { name: 'Owner Investment', type: 'capital' },
+  { name: 'Other Investor', type: 'capital' },
   // Withdrawals
   { name: 'Owner Draw', type: 'withdrawal' },
   // Assets

@@ -65,6 +65,25 @@ const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 2,
+    name: 'add other investor capital category',
+    up(db) {
+      const count = (db.prepare('SELECT COUNT(*) AS n FROM categories').get() as { n: number }).n
+      if (count === 0) {
+        return
+      }
+      const exists = db
+        .prepare('SELECT 1 AS n FROM categories WHERE name = ? COLLATE NOCASE AND type = ?')
+        .get('Other Investor', 'capital') as { n: number } | undefined
+      if (!exists) {
+        db.prepare('INSERT INTO categories (name, type, color, is_default) VALUES (?, ?, NULL, 1)').run(
+          'Other Investor',
+          'capital',
+        )
+      }
+    },
+  },
 ]
 
 export function ensureMigrationTable(db: Database.Database): void {

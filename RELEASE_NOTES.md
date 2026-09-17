@@ -1,5 +1,14 @@
 # Financial Encoder — Release Notes
 
+## v1.0.8 (September 17, 2026)
+
+### Updates
+
+- **New "Other Investor" capital category.** Besides the default *Owner
+  Investment* category, capital transactions can now be recorded under *Other
+  Investor*. A database migration adds it automatically to existing installs,
+  and fresh installs get it from the default seed.
+
 ## v1.0.7 (September 17, 2026)
 
 ### Updates
