@@ -13,6 +13,7 @@ import {
   periodRange,
   type PeriodKey,
 } from '../../utils/periods'
+import { monthlyToCashFlowChartData } from '../../utils/chart'
 import { logToMain } from '../../services/logger'
 import type {
   CalculationFilter,
@@ -86,6 +87,8 @@ function Reports(): React.JSX.Element {
   const periodLabel = period === 'custom' || !PERIOD_LABELS[period]
     ? `${customFrom || 'Start'} – ${customTo || 'Now'}`
     : PERIOD_LABELS[period]
+
+  const chartData = useMemo(() => monthlyToCashFlowChartData(monthly, true), [monthly])
 
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | 'pdf' | null>(null)
 
@@ -282,7 +285,12 @@ function Reports(): React.JSX.Element {
           {monthly.length > 0 && (
             <div className="card page-cf">
               <h3 className="card__title">Cash Flow Over Time</h3>
-              <CashFlowChart data={monthly} currencyCode={currencyCode} height={280} />
+              <CashFlowChart
+              data={chartData}
+              currencyCode={currencyCode}
+              height={280}
+              labels={{ inflow: 'Inflows', outflow: 'Outflows', net: 'Net Cash Flow' }}
+            />
             </div>
           )}
 

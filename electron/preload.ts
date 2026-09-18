@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import { AppSettings, CalculationFilter, CategoryType, ExportRequest, FinancialEncoderApi, ImportMapping, TransactionFilters, TransactionInput, LogLevel, UpdateStatus } from './types/ipc'
+import { AppSettings, CalculationFilter, CashFlowGranularity, CategoryType, ExportRequest, FinancialEncoderApi, ImportMapping, TransactionFilters, TransactionInput, LogLevel, UpdateStatus } from './types/ipc'
 
 const api: FinancialEncoderApi = {
   app: {
@@ -30,6 +30,8 @@ const api: FinancialEncoderApi = {
   calculations: {
     totals: (filter?: CalculationFilter) => ipcRenderer.invoke('calculations:totals', filter),
     monthly: (filter?: CalculationFilter) => ipcRenderer.invoke('calculations:monthly', filter),
+    cashFlow: (filter?: CalculationFilter, granularity?: CashFlowGranularity) =>
+      ipcRenderer.invoke('calculations:cash-flow', filter, granularity),
     byCategory: (filter?: CalculationFilter) => ipcRenderer.invoke('calculations:by-category', filter),
   },
   imports: {

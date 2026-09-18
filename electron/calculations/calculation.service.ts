@@ -1,9 +1,12 @@
 import { getDb } from '../database/connection'
-import { categoryBreakdown, monthlySummary, totals } from './engine'
+import { cashFlowSeries, categoryBreakdown, monthlySummary, totals } from './engine'
 import type {
   CalcTransaction,
   CalculationFilter,
   CalculationTotals,
+  CashFlowGranularity,
+  CashFlowPoint,
+  CashFlowSeriesOptions,
   CategoryBreakdown,
   MonthlySummary,
   MonthlySummaryOptions,
@@ -88,6 +91,18 @@ export function calculateMonthlySummaries(filter: CalculationFilter = {}): Month
     to: filter.date_to,
   }
   return monthlySummary(loadTransactions(filter), options)
+}
+
+export function calculateCashFlowSeries(
+  filter: CalculationFilter = {},
+  granularity: CashFlowGranularity = 'month',
+): CashFlowPoint[] {
+  const options: CashFlowSeriesOptions = {
+    from: filter.date_from,
+    to: filter.date_to,
+    granularity,
+  }
+  return cashFlowSeries(loadTransactions(filter), options)
 }
 
 export function calculateCategoryBreakdown(filter: CalculationFilter = {}): CategoryBreakdown[] {

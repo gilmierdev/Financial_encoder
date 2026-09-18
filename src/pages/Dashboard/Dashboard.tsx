@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../../components/ui/PageHeader'
-import EmptyState from '../../components/ui/EmptyState'
 import CashFlowChart from '../../components/charts/CashFlowChart'
 import { api, ApiError } from '../../services/api'
 import { useSettings } from '../../contexts/SettingsContext'
 import { formatCurrency } from '../../utils/currency'
 import { formatDate, parseISODate } from '../../utils/dates'
+import { cashFlowPointsToChartData } from '../../utils/chart'
 import {
-  cashFlowWindow,
+  cashFlowGranularity,
   customRangeInvalid,
-  formatMonth,
   PERIOD_KEYS,
   PERIOD_LABELS,
   periodRange,
@@ -19,8 +18,8 @@ import { logToMain } from '../../services/logger'
 import type {
   CalculationFilter,
   CalculationTotals,
+  CashFlowPoint,
   CategoryBreakdown,
-  MonthlySummary,
   Transaction,
   TransactionPage,
 } from '../../../electron/types/ipc'
@@ -35,15 +34,24 @@ function Dashboard(): React.JSX.Element {
   const [customTo, setCustomTo] = useState('')
 
   const [totals, setTotals] = useState<CalculationTotals | null>(null)
-  const [monthly, setMonthly] = useState<MonthlySummary[]>([])
+  const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([])
   const [breakdown, setBreakdown] = useState<CategoryBreakdown[]>([])
   const [recent, setRecent] = useState<TransactionPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const range = useMemo(() => periodRange(period, customFrom, customTo), [period, customFrom, customTo])
-  const cashRange = useMemo(() => cashFlowWindow(range.date_to, range.date_from), [range.date_from, range.date_to])
+  const granularity = useMemo(() => cashFlowGranularity(range), [range])
   const customInvalid = customRangeInvalid(customFrom, customTo)
+
+  /** Single source of truth applied to every dashboard query. */
+  const calcFilter = useMemo<CalculationFilter>(
+    () => ({
+      ...(range.date_from ? { date_from: range.date_from } : {}),
+      ...(range.date_to ? { date_to: range.date_to } : {}),
+    }),
+    [range],
+  )
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true)
@@ -54,24 +62,22 @@ function Dashboard(): React.JSX.Element {
       return
     }
 
-    const calcFilter: CalculationFilter = {
-      ...(range.date_from ? { date_from: range.date_from } : {}),
-      ...(range.date_to ? { date_to: range.date_to } : {}),
-    }
-    const cashFilter: CalculationFilter = {
-      date_from: cashRange.date_from,
-      date_to: cashRange.date_to,
-    }
-
     try {
-      const [totalsResult, monthlyResult, breakdownResult, recentResult] = await Promise.all([
+      const [totalsResult, cashFlowResult, breakdownResult, recentResult] = await Promise.all([
         api.calculations.totals(calcFilter),
-        api.calculations.monthly(cashFilter),
+        api.calculations.cashFlow(calcFilter, granularity),
         api.calculations.byCategory(calcFilter),
-        api.transactions.list({ page: 1, page_size: 8, sort_by: 'date', sort_dir: 'desc' }),
+        api.transactions.list({
+          page: 1,
+          page_size: 8,
+          sort_by: 'date',
+          sort_dir: 'desc',
+          ...(calcFilter.date_from ? { date_from: calcFilter.date_from } : {}),
+          ...(calcFilter.date_to ? { date_to: calcFilter.date_to } : {}),
+        }),
       ])
       setTotals(totalsResult)
-      setMonthly(monthlyResult)
+      setCashFlow(cashFlowResult)
       setBreakdown(breakdownResult)
       setRecent(recentResult)
     } catch (err) {
@@ -81,7 +87,7 @@ function Dashboard(): React.JSX.Element {
     } finally {
       setLoading(false)
     }
-  }, [range, cashRange, customInvalid])
+  }, [calcFilter, granularity, customInvalid])
 
   useEffect(() => {
     void load()
@@ -89,7 +95,11 @@ function Dashboard(): React.JSX.Element {
 
   const income = totals?.income ?? 0
   const expense = totals?.expense ?? 0
-  const net = (totals?.net ?? 0)
+  const netPosition = income - expense
+  const netCapital = (totals?.capital ?? 0) - (totals?.withdrawal ?? 0)
+
+  const chartData = useMemo(() => cashFlowPointsToChartData(cashFlow, granularity), [cashFlow, granularity])
+  const hasMovement = chartData.some((d) => d.inflow !== 0 || d.outflow !== 0 || d.net !== 0)
 
   const incomeCategories = useMemo(
     () => breakdown.filter((c) => c.type === 'income').slice(0, 5),
@@ -99,6 +109,21 @@ function Dashboard(): React.JSX.Element {
     () => breakdown.filter((c) => c.type === 'expense').slice(0, 5),
     [breakdown],
   )
+
+  const periodLabel = useMemo(() => {
+    const from = range.date_from ? formatDate(parseISODate(range.date_from), dateFormat) : null
+    const to = range.date_to ? formatDate(parseISODate(range.date_to), dateFormat) : null
+    if (from && to) {
+      return `${from} – ${to}`
+    }
+    if (from) {
+      return `From ${from}`
+    }
+    if (to) {
+      return `Up to ${to}`
+    }
+    return 'All time'
+  }, [range, dateFormat])
 
   return (
     <div className="page">
@@ -185,86 +210,81 @@ function Dashboard(): React.JSX.Element {
             </div>
             <div className="card page-summary__card">
               <span className="page-summary__label">Net Position</span>
-              <span className={`page-summary__value ${net >= 0 ? 'page-summary__value--positive' : 'page-summary__value--negative'}`}>
-                {formatCurrency(net, currencyCode)}
+              <span className={`page-summary__value ${netPosition >= 0 ? 'page-summary__value--positive' : 'page-summary__value--negative'}`}>
+                {formatCurrency(netPosition, currencyCode)}
               </span>
             </div>
             <div className="card page-summary__card">
               <span className="page-summary__label">Net Capital</span>
-              <span className={`page-summary__value ${(totals.capital - totals.withdrawal) >= 0 ? 'page-summary__value--positive' : 'page-summary__value--negative'}`}>
-                {formatCurrency(totals.capital - totals.withdrawal, currencyCode)}
+              <span className={`page-summary__value ${netCapital >= 0 ? 'page-summary__value--positive' : 'page-summary__value--negative'}`}>
+                {formatCurrency(netCapital, currencyCode)}
               </span>
             </div>
           </div>
 
           {/* Cash flow + recent transactions */}
-          {monthly.length > 0 || (recent && recent.transactions.length > 0) ? (
-            <div className="dash-lower">
-              {monthly.length > 0 && (
-                <div className="card dash-cf">
-                  <h3 className="card__title">Cash Flow Over Time</h3>
-                  <CashFlowChart data={monthly} currencyCode={currencyCode} height={220} />
-                  <table className="ib-table" style={{ marginTop: 16 }}>
+          <div className="dash-lower">
+            <div className="card dash-cf">
+              <div className="dash-cf__heading">
+                <h3 className="card__title">Cash Flow Over Time</h3>
+                <span className="dash-range-label">{periodLabel}</span>
+              </div>
+              <CashFlowChart data={chartData} currencyCode={currencyCode} height={220} />
+
+              {hasMovement && (
+                <div className="tx-table-wrap dash-cf__table">
+                  <table className="tx-table tx-table--compact">
                     <thead>
                       <tr>
-                        <th>Month</th>
-                        <th className="ib-table__right">In</th>
-                        <th className="ib-table__right">Out</th>
-                        <th className="ib-table__right">Net</th>
+                        <th>Period</th>
+                        <th className="tx-table__amount">Income</th>
+                        <th className="tx-table__amount">Expenses</th>
+                        <th className="tx-table__amount">Net Cash Flow</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {monthly.map((row) => {
-                        const inflow = row.income + row.capital
-                        const outflow = row.expense + row.withdrawal
-                        const rowNet = inflow - outflow
-                        return (
-                          <tr key={row.month}>
-                            <td>{formatMonth(row.month)}</td>
-                            <td className="ib-table__right">{formatCurrency(inflow, currencyCode)}</td>
-                            <td className="ib-table__right">{formatCurrency(outflow, currencyCode)}</td>
-                            <td className={`ib-table__right ${rowNet >= 0 ? 'cf-positive' : 'cf-negative'}`}>
-                              {formatCurrency(rowNet, currencyCode)}
-                            </td>
-                          </tr>
-                        )
-                      })}
+                      {chartData.map((row) => (
+                        <tr key={row.key}>
+                          <td>{row.fullLabel}</td>
+                          <td className="tx-table__amount">{formatCurrency(row.inflow, currencyCode)}</td>
+                          <td className="tx-table__amount">{formatCurrency(row.outflow, currencyCode)}</td>
+                          <td className={`tx-table__amount ${row.net >= 0 ? 'cf-positive' : 'cf-negative'}`}>
+                            {formatCurrency(row.net, currencyCode)}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               )}
+            </div>
 
-              {recent && recent.transactions.length > 0 && (
-                <div className="card dash-recent">
-                  <h3 className="card__title">Recent Transactions</h3>
-                  <ul className="dash-list">
-                    {recent.transactions.slice(0, 8).map((tx: Transaction) => (
-                      <li key={tx.id} className="dash-list__item">
-                        <div className="dash-list__main">
-                          <span className="dash-list__desc">{tx.description}</span>
-                          <span className="dash-list__meta">
-                            {formatDate(parseISODate(tx.date), dateFormat)} · {tx.category_name}
-                          </span>
-                        </div>
-                        <div className="dash-list__right">
-                          <span className={`dash-list__amount ${tx.type === 'expense' || tx.type === 'withdrawal' ? 'cf-negative' : 'cf-positive'}`}>
-                            {formatCurrency(tx.amount, currencyCode)}
-                          </span>
-                          <span className={`badge badge--${tx.type}`}>{tx.type}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            <div className="card dash-recent">
+              <h3 className="card__title">Recent Transactions</h3>
+              {recent && recent.transactions.length > 0 ? (
+                <ul className="dash-list">
+                  {recent.transactions.slice(0, 8).map((tx: Transaction) => (
+                    <li key={tx.id} className="dash-list__item">
+                      <div className="dash-list__main">
+                        <span className="dash-list__desc">{tx.description}</span>
+                        <span className="dash-list__meta">
+                          {formatDate(parseISODate(tx.date), dateFormat)} · {tx.category_name}
+                        </span>
+                      </div>
+                      <div className="dash-list__right">
+                        <span className={`dash-list__amount ${tx.type === 'expense' || tx.type === 'withdrawal' ? 'cf-negative' : 'cf-positive'}`}>
+                          {formatCurrency(tx.amount, currencyCode)}
+                        </span>
+                        <span className={`badge badge--${tx.type}`}>{tx.type}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="dash-recent__empty">No transactions for this period.</p>
               )}
             </div>
-          ) : (
-            <EmptyState
-              icon="dashboard"
-              title="No data yet"
-              description="Record your first transaction and this dashboard will summarise your finances."
-            />
-          )}
+          </div>
 
           {/* Top categories */}
           {(incomeCategories.length > 0 || expenseCategories.length > 0) && (

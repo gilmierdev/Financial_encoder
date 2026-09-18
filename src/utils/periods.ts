@@ -1,3 +1,6 @@
+import type { CashFlowGranularity } from '../../electron/types/ipc'
+import { toISODate } from './dates'
+
 export type PeriodKey = 'this-month' | 'last-3-months' | 'this-year' | 'all' | 'custom'
 
 export interface PeriodRange {
@@ -33,17 +36,23 @@ export function formatMonth(key: string): string {
   return `${monthNames[Number(m) - 1]} ${y}`
 }
 
+/**
+ * Resolves a period selection into inclusive `YYYY-MM-DD` bounds.
+ *
+ * Rolling periods end at *today* (not at the end of the calendar month/year) so
+ * a chart never zero-fills future days/months that have not happened yet.
+ */
 export function periodRange(key: PeriodKey, customFrom: string, customTo: string): PeriodRange {
   const now = new Date()
   switch (key) {
     case 'this-month':
-      return { date_from: startOfMonth(now), date_to: endOfMonth(now) }
+      return { date_from: startOfMonth(now), date_to: toISODate(now) }
     case 'last-3-months': {
       const from = new Date(now.getFullYear(), now.getMonth() - 2, 1)
-      return { date_from: startOfMonth(from), date_to: endOfMonth(now) }
+      return { date_from: startOfMonth(from), date_to: toISODate(now) }
     }
     case 'this-year':
-      return { date_from: `${now.getFullYear()}-01-01`, date_to: `${now.getFullYear()}-12-31` }
+      return { date_from: `${now.getFullYear()}-01-01`, date_to: toISODate(now) }
     case 'all':
       return {}
     case 'custom':
@@ -59,16 +68,30 @@ export function customRangeInvalid(from: string, to: string): boolean {
   return from !== '' && to !== '' && from > to
 }
 
+/** Number of whole days between two `YYYY-MM-DD` strings (UTC based). */
+export function dateSpanDays(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number)
+  const [ty, tm, td] = to.split('-').map(Number)
+  const start = Date.UTC(fy, (fm || 1) - 1, fd || 1)
+  const end = Date.UTC(ty, (tm || 1) - 1, td || 1)
+  return Math.round((end - start) / 86_400_000)
+}
+
 /**
- * Resolves the window the cash-flow chart should cover. Explicit period bounds
- * win (so the chart always reflects the selection); otherwise falls back to the
- * last six months of activity.
+ * Picks a sensible bucket size for the cash-flow chart:
+ * short ranges stay daily, medium ranges roll up weekly, and long ranges
+ * (a year or all time) aggregate monthly.
  */
-export function cashFlowWindow(date_to: string | undefined, date_from: string | undefined): PeriodRange {
-  if (date_from && date_to) {
-    return { date_from, date_to }
+export function cashFlowGranularity(range: PeriodRange): CashFlowGranularity {
+  if (!range.date_from || !range.date_to) {
+    return 'month'
   }
-  const end = date_to ? new Date(date_to + 'T12:00:00') : new Date()
-  const start = new Date(end.getFullYear(), end.getMonth() - 5, 1)
-  return { date_from: startOfMonth(start), date_to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}` }
+  const span = dateSpanDays(range.date_from, range.date_to)
+  if (span <= 31) {
+    return 'day'
+  }
+  if (span <= 120) {
+    return 'week'
+  }
+  return 'month'
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../ui/Modal'
 import { api, ApiError } from '../../services/api'
+import { toISODate } from '../../utils/dates'
 import { logToMain } from '../../services/logger'
 import type { Category, Transaction, TransactionInput, TransactionType } from '../../../electron/types/ipc'
 
@@ -34,7 +35,7 @@ interface FormState {
 }
 
 const emptyForm = (defaultType: TransactionType = 'expense'): FormState => ({
-  date: new Date().toISOString().slice(0, 10),
+  date: toISODate(new Date()),
   description: '',
   category_id: '',
   type: defaultType,

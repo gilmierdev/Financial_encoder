@@ -77,6 +77,34 @@ export interface MonthlySummary {
   count: number
 }
 
+/** Bucket size used by the cash-flow time series. */
+export type CashFlowGranularity = 'day' | 'week' | 'month'
+
+/** A single zero-filled bucket in a cash-flow time series. */
+export interface CashFlowPoint {
+  /**
+   * Stable bucket key. `YYYY-MM-DD` for day/week buckets (week = Monday start)
+   * and `YYYY-MM` for month buckets.
+   */
+  key: string
+  /** Inclusive start date of the bucket, canonical `YYYY-MM-DD`. */
+  date: string
+  income: number
+  expense: number
+  capital: number
+  withdrawal: number
+  /** income + capital - expense - withdrawal. */
+  net: number
+  count: number
+}
+
+/** Options for the cash-flow time series. Bounds are inclusive. */
+export interface CashFlowSeriesOptions {
+  from?: string
+  to?: string
+  granularity?: CashFlowGranularity
+}
+
 /** Aggregated totals per category. */
 export interface CategoryBreakdown {
   category_id: number

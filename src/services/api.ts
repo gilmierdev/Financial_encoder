@@ -6,6 +6,8 @@ import type {
   BackupRecord,
   CalculationFilter,
   CalculationTotals,
+  CashFlowGranularity,
+  CashFlowPoint,
   CategoryBreakdown,
   Category,
   CategoryType,
@@ -76,6 +78,7 @@ export interface Api {
   calculations: {
     totals(filter?: CalculationFilter): Promise<CalculationTotals>
     monthly(filter?: CalculationFilter): Promise<MonthlySummary[]>
+    cashFlow(filter?: CalculationFilter, granularity?: CashFlowGranularity): Promise<CashFlowPoint[]>
     byCategory(filter?: CalculationFilter): Promise<CategoryBreakdown[]>
   }
   imports: {
@@ -176,6 +179,9 @@ export const api: Api = {
     },
     async monthly(filter?: CalculationFilter) {
       return unwrap(await window.financialEncoder.calculations.monthly(filter))
+    },
+    async cashFlow(filter?: CalculationFilter, granularity?: CashFlowGranularity) {
+      return unwrap(await window.financialEncoder.calculations.cashFlow(filter, granularity))
     },
     async byCategory(filter?: CalculationFilter) {
       return unwrap(await window.financialEncoder.calculations.byCategory(filter))

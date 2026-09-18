@@ -1,6 +1,6 @@
 import type { Category, CategoryType } from '../categories/category.service'
 import type { Transaction, TransactionFilters, TransactionInput, TransactionPage } from '../transactions/transaction.service'
-import type { CalculationFilter, CalculationTotals, CategoryBreakdown, MonthlySummary } from '../calculations/types'
+import type { CalculationFilter, CalculationTotals, CashFlowGranularity, CashFlowPoint, CategoryBreakdown, MonthlySummary } from '../calculations/types'
 import type { ImportMapping, ImportPreview, ImportResult } from '../import/import.service'
 import type { ExportRequest, ExportResult } from '../export/export.ipc'
 import type { BackupRecord, BackupExportResult, RestoreFileResult } from '../database/backup.service'
@@ -78,6 +78,7 @@ export interface FinancialEncoderApi {
   calculations: {
     totals(filter?: CalculationFilter): Promise<IpcResult<CalculationTotals>>
     monthly(filter?: CalculationFilter): Promise<IpcResult<MonthlySummary[]>>
+    cashFlow(filter?: CalculationFilter, granularity?: CashFlowGranularity): Promise<IpcResult<CashFlowPoint[]>>
     byCategory(filter?: CalculationFilter): Promise<IpcResult<CategoryBreakdown[]>>
   }
   imports: {
@@ -118,6 +119,8 @@ export type {
   CalculationFilter,
   CalculationTotals,
   CalculationType,
+  CashFlowGranularity,
+  CashFlowPoint,
   CategoryBreakdown,
   MonthlySummary,
 } from '../calculations/types'

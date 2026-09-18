@@ -1,15 +1,29 @@
 import { AppError, registerIpcHandler } from '../services/ipc-handler'
 import {
+  calculateCashFlowSeries,
   calculateCategoryBreakdown,
   calculateMonthlySummaries,
   calculateTotals,
 } from '../calculations/calculation.service'
-import type { CalculationFilter } from '../calculations/types'
+import type { CalculationFilter, CashFlowGranularity } from '../calculations/types'
 import type {
   CalculationTotals,
+  CashFlowPoint,
   CategoryBreakdown,
   MonthlySummary,
 } from '../calculations/types'
+
+const GRANULARITIES = new Set<CashFlowGranularity>(['day', 'week', 'month'])
+
+function validateGranularity(raw: unknown): CashFlowGranularity {
+  if (raw === undefined || raw === null) {
+    return 'month'
+  }
+  if (typeof raw !== 'string' || !GRANULARITIES.has(raw as CashFlowGranularity)) {
+    throw new AppError('VALIDATION_ERROR', 'granularity must be one of: day, week, month.')
+  }
+  return raw as CashFlowGranularity
+}
 
 const VALID_TYPES = new Set<string>([
   'income',
@@ -86,6 +100,10 @@ export function registerCalculationIpcHandlers(): void {
 
   registerIpcHandler<MonthlySummary[]>('calculations:monthly', (_event, ...args: unknown[]) =>
     calculateMonthlySummaries(validateFilter(args[0])),
+  )
+
+  registerIpcHandler<CashFlowPoint[]>('calculations:cash-flow', (_event, ...args: unknown[]) =>
+    calculateCashFlowSeries(validateFilter(args[0]), validateGranularity(args[1])),
   )
 
   registerIpcHandler<CategoryBreakdown[]>('calculations:by-category', (_event, ...args: unknown[]) =>

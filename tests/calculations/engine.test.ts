@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyFilter,
+  cashFlowSeries,
   categoryBreakdown,
   matchesFilter,
   monthlySummary,
@@ -238,6 +239,99 @@ describe('monthlySummary', () => {
       makeTx({ date: '2026-08-02', type: 'income', amount: 20.2 }),
     ]
     const result = monthlySummary(txs)
+    expect(result[0].income).toBeCloseTo(30.3)
+  })
+})
+
+describe('cashFlowSeries', () => {
+  it('returns empty array for empty input with no bounds', () => {
+    expect(cashFlowSeries([])).toEqual([])
+  })
+
+  it('zero-fills every day between explicit day bounds', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-08-18', type: 'income', amount: 100 }),
+      makeTx({ date: '2026-08-20', type: 'expense', amount: 30 }),
+    ]
+    const result = cashFlowSeries(txs, { from: '2026-08-18', to: '2026-08-20', granularity: 'day' })
+    expect(result).toHaveLength(3)
+    expect(result.map((p) => p.key)).toEqual(['2026-08-18', '2026-08-19', '2026-08-20'])
+    expect(result[0].income).toBe(100)
+    expect(result[0].count).toBe(1)
+    expect(result[1].count).toBe(0)
+    expect(result[2].expense).toBe(30)
+    expect(result[2].count).toBe(1)
+  })
+
+  it('aggregates into weeks starting on Monday', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-08-19', type: 'income', amount: 500 }),
+      makeTx({ date: '2026-08-20', type: 'income', amount: 700 }),
+    ]
+    const result = cashFlowSeries(txs, { from: '2026-08-17', to: '2026-08-23', granularity: 'week' })
+    expect(result).toHaveLength(1)
+    expect(result[0].key).toBe('2026-08-17')
+    expect(result[0].date).toBe('2026-08-17')
+    expect(result[0].income).toBe(1200)
+    expect(result[0].count).toBe(2)
+  })
+
+  it('rolls multiple months up to month buckets and zero-fills gaps', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-01-05', type: 'income', amount: 300 }),
+      makeTx({ date: '2026-03-10', type: 'expense', amount: 50 }),
+    ]
+    const result = cashFlowSeries(txs, { from: '2026-01-01', to: '2026-03-31', granularity: 'month' })
+    expect(result).toHaveLength(3)
+    expect(result.map((p) => p.key)).toEqual(['2026-01', '2026-02', '2026-03'])
+    expect(result[2].expense).toBe(50)
+  })
+
+  it('excludes transactions outside the explicit bounds', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-08-17', type: 'income', amount: 999 }),
+      makeTx({ date: '2026-08-18', type: 'income', amount: 100 }),
+      makeTx({ date: '2026-09-01', type: 'income', amount: 999 }),
+    ]
+    const result = cashFlowSeries(txs, { from: '2026-08-18', to: '2026-08-31', granularity: 'day' })
+    const totalIncome = result.reduce((acc, point) => acc + point.income, 0)
+    expect(totalIncome).toBe(100)
+  })
+
+  it('computes net per bucket as income + capital - expense - withdrawal', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-06-01', type: 'income', amount: 1000 }),
+      makeTx({ date: '2026-06-10', type: 'capital', amount: 500 }),
+      makeTx({ date: '2026-06-15', type: 'expense', amount: 200 }),
+      makeTx({ date: '2026-06-20', type: 'withdrawal', amount: 100 }),
+    ]
+    const result = cashFlowSeries(txs, { granularity: 'month' })
+    expect(result).toHaveLength(1)
+    expect(result[0].net).toBe(1200)
+  })
+
+  it('derives the bucket range from the data when no bounds are given', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-01-05', type: 'income', amount: 100 }),
+      makeTx({ date: '2026-04-15', type: 'income', amount: 200 }),
+    ]
+    const result = cashFlowSeries(txs, { granularity: 'month' })
+    expect(result.map((p) => p.key)).toEqual(['2026-01', '2026-02', '2026-03', '2026-04'])
+  })
+
+  it('handles fractional amounts without drift', () => {
+    resetSeq()
+    const txs = [
+      makeTx({ date: '2026-08-01', type: 'income', amount: 10.1 }),
+      makeTx({ date: '2026-08-02', type: 'income', amount: 20.2 }),
+    ]
+    const result = cashFlowSeries(txs, { granularity: 'month' })
     expect(result[0].income).toBeCloseTo(30.3)
   })
 })

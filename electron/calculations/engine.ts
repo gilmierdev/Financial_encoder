@@ -3,6 +3,9 @@ import type {
   CalculationFilter,
   CalculationTotals,
   CalculationType,
+  CashFlowGranularity,
+  CashFlowPoint,
+  CashFlowSeriesOptions,
   CategoryBreakdown,
   MonthlySummary,
   MonthlySummaryOptions,
@@ -197,6 +200,157 @@ export function monthlySummary(
   }
 
   return [...months.values()].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
+}
+
+/** Zero left-pads a number to two digits. */
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+/**
+ * Parses a `YYYY-MM-DD` string into a UTC-midnight Date. Using UTC keeps
+ * bucketing free of any local timezone offset (an off-by-one-day bug).
+ */
+function parseUTCDate(date: string): Date {
+  const [year, month, day] = date.split('-').map((part) => Number(part))
+  return new Date(Date.UTC(year, (month || 1) - 1, day || 1))
+}
+
+/** Formats a UTC Date back into a `YYYY-MM-DD` string. */
+function toUTCDateString(date: Date): string {
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
+}
+
+/** Adds a number of days to a `YYYY-MM-DD` string. */
+function addDays(date: string, delta: number): string {
+  const d = parseUTCDate(date)
+  d.setUTCDate(d.getUTCDate() + delta)
+  return toUTCDateString(d)
+}
+
+/** Returns the Monday that starts the week containing `date`. */
+function weekStart(date: string): string {
+  const d = parseUTCDate(date)
+  const offset = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - offset)
+  return toUTCDateString(d)
+}
+
+/** Computes the bucket key a transaction date belongs to. */
+function bucketKey(date: string, granularity: CashFlowGranularity): string {
+  switch (granularity) {
+    case 'day':
+      return date
+    case 'week':
+      return weekStart(date)
+    case 'month':
+      return monthKey(date)
+  }
+}
+
+/** Returns the first bucket key following `key`. */
+function nextBucketKey(key: string, granularity: CashFlowGranularity): string {
+  switch (granularity) {
+    case 'day':
+      return addDays(key, 1)
+    case 'week':
+      return addDays(key, 7)
+    case 'month':
+      return addMonths(key, 1)
+  }
+}
+
+function emptyCashFlowPoint(key: string): CashFlowPoint {
+  const date = key.length === 7 ? `${key}-01` : key
+  return {
+    key,
+    date,
+    income: 0,
+    expense: 0,
+    capital: 0,
+    withdrawal: 0,
+    net: 0,
+    count: 0,
+  }
+}
+
+/**
+ * Builds a zero-filled cash-flow time series (day, week or month buckets).
+ *
+ * Explicit `from`/`to` bounds always win so the series covers the requested
+ * period even when there are no transactions. Without bounds the series spans
+ * only the months/buckets that actually contain data. All sums are accumulated
+ * in integer cents to avoid floating-point drift.
+ */
+export function cashFlowSeries(
+  transactions: CalcTransaction[],
+  options: CashFlowSeriesOptions = {},
+): CashFlowPoint[] {
+  const granularity: CashFlowGranularity = options.granularity ?? 'month'
+
+  // Explicit bounds always win: transactions outside them must never expand the
+  // series (the series only stretches when a side has no bound at all).
+  const hasFrom = options.from !== undefined && options.from !== ''
+  const hasTo = options.to !== undefined && options.to !== ''
+
+  let startKey = hasFrom ? bucketKey(options.from!, granularity) : null
+  let endKey = hasTo ? bucketKey(options.to!, granularity) : null
+
+  for (const tx of transactions) {
+    const key = bucketKey(tx.date, granularity)
+    if (!hasFrom && (startKey == null || key < startKey)) {
+      startKey = key
+    }
+    if (!hasTo && (endKey == null || key > endKey)) {
+      endKey = key
+    }
+  }
+
+  if (startKey == null) {
+    return []
+  }
+  if (endKey == null) {
+    endKey = startKey
+  }
+  if (startKey > endKey) {
+    return []
+  }
+
+  const points = new Map<string, CashFlowPoint>()
+  for (let key = startKey; key <= endKey; key = nextBucketKey(key, granularity)) {
+    points.set(key, emptyCashFlowPoint(key))
+  }
+
+  const centsBuckets = new Map<string, Record<CalculationType, number>>()
+
+  for (const tx of transactions) {
+    const key = bucketKey(tx.date, granularity)
+    const point = points.get(key)
+    if (!point) {
+      continue
+    }
+    let bucket = centsBuckets.get(key)
+    if (!bucket) {
+      bucket = { income: 0, expense: 0, capital: 0, withdrawal: 0, asset: 0, liability: 0 }
+      centsBuckets.set(key, bucket)
+    }
+    bucket[tx.type] += toCents(tx.amount)
+    point.count += 1
+  }
+
+  for (const [key, bucket] of centsBuckets) {
+    const point = points.get(key)
+    if (!point) {
+      continue
+    }
+    point.income = fromCents(bucket.income)
+    point.expense = fromCents(bucket.expense)
+    point.capital = fromCents(bucket.capital)
+    point.withdrawal = fromCents(bucket.withdrawal)
+    point.net = fromCents(bucket.income + bucket.capital - bucket.expense - bucket.withdrawal)
+  }
+
+  return [...points.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 }
 
 /** Aggregates totals per category, ordered by type then descending amount. */
