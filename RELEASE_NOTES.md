@@ -1,5 +1,23 @@
 # Financial Encoder — Release Notes
 
+## v1.0.11 (September 18, 2026)
+
+### Dashboard
+
+- **Richer cash-flow insight.** The Dashboard now shows an income-vs-expense
+  series with a new cash-flow chart that breaks down income, expenses, capital
+  and withdrawals, including the net position, at daily, weekly or monthly
+  granularity. The same series powers the Cash Flow and Reports pages so the
+  numbers always match.
+- **More useful charts.** Charts now adapt more cleanly to empty ranges and
+  single transactions, with better tooltips and labels.
+
+### App icon
+
+- **New application icon.** The installer, shortcuts, taskbar and in-app
+  favicon now use the new logo in `build/logo.png` (regenerated from it via
+  `build/make-icon-from-logo.ps1`).
+
 ## v1.0.10 (September 18, 2026)
 
 ### Reliability
