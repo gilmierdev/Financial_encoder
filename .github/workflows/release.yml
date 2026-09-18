@@ -108,8 +108,9 @@ jobs:
 
       # Publish with gh instead of electron-builder's own publisher, which can
       # race and create duplicate releases for one tag. The release is created
-      # as a draft, assets are uploaded, and only then is it published - so an
-      # upload failure stays invisible to the updater instead of breaking it.
+      # as a draft, assets are uploaded one-by-one with retries, and the upload
+      # is verified against the server BEFORE the release is published - so any
+      # upload failure leaves only an invisible draft, never a broken release.
       - name: Publish GitHub release
         shell: pwsh
         env:
@@ -119,17 +120,43 @@ jobs:
             throw "The Publish step requires a version tag (got ref type '$env:GITHUB_REF_TYPE'). Push a vX.Y.Z tag to release."
           }
           $tag = $env:GITHUB_REF_NAME
+          $releaseDir = (Resolve-Path "release").Path
+          $expected = @(
+            (Get-ChildItem $releaseDir -Filter "Financial-Encoder-Setup-*.exe" -ErrorAction Stop | Select-Object -First 1).Name,
+            (Get-ChildItem $releaseDir -Filter "*.exe.blockmap" -ErrorAction Stop | Select-Object -First 1).Name,
+            "latest.yml"
+          )
+
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Removing existing release for $tag"
             gh release delete $tag --yes
           }
-          $assets = @()
-          $assets += (Get-ChildItem "release" -Filter "Financial-Encoder-Setup-*.exe").FullName
-          $assets += (Get-ChildItem "release" -Filter "*.exe.blockmap").FullName
-          $assets += (Resolve-Path "release/latest.yml").Path
-          gh release create $tag @assets --draft --title $tag --notes-file RELEASE_NOTES.md
+
+          gh release create $tag --draft --title $tag --notes-file RELEASE_NOTES.md
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed for $tag" }
+
+          foreach ($name in $expected) {
+            $path = Join-Path $releaseDir $name
+            $ok = $false
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              gh release upload $tag $path --clobber
+              if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "uploaded $name"; break }
+              Write-Host "upload failed for $name (attempt $attempt/3), retrying..."
+              Start-Sleep -Seconds 15
+            }
+            if (-not $ok) { throw "Failed to upload asset $name to release $tag" }
+          }
+
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
+          $release = Invoke-RestMethod -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+          foreach ($name in $expected) {
+            if ($release.assets.name -notcontains $name) { throw "Asset $name missing from release $tag after upload" }
+          }
+          Write-Host "All $($expected.Count) assets confirmed on the release."
+
           gh release edit $tag --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw "Failed to publish release $tag (draft kept, nothing public)" }
           Write-Host "Published release $tag"
 
       # Remove the certificate from the runner once the build is done.
