@@ -126,11 +126,15 @@ jobs:
             (Get-ChildItem $releaseDir -Filter "*.exe.blockmap" -ErrorAction Stop | Select-Object -First 1).Name,
             "latest.yml"
           )
+          $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY"
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
 
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Removing existing release for $tag"
-            gh release delete $tag --yes
+          # GitHub's GET /releases/tags/{tag} returns 404 for draft releases,
+          # so drafts are found via the releases LIST endpoint instead.
+          $existing = (Invoke-RestMethod -Headers $h -Uri "$api/releases?per_page=100") | Where-Object { $_.tag_name -eq $tag }
+          foreach ($r in $existing) {
+            Write-Host "Removing existing release id $($r.id) for $tag"
+            Invoke-RestMethod -Method Delete -Headers $h -Uri "$api/releases/$($r.id)"
           }
 
           gh release create $tag --draft --title $tag --notes-file RELEASE_NOTES.md
@@ -148,8 +152,8 @@ jobs:
             if (-not $ok) { throw "Failed to upload asset $name to release $tag" }
           }
 
-          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "User-Agent" = "fe-release-workflow" }
-          $release = Invoke-RestMethod -Headers $h -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+          $release = (Invoke-RestMethod -Headers $h -Uri "$api/releases?per_page=100") | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
+          if (-not $release) { throw "Release $tag not found after upload" }
           foreach ($name in $expected) {
             if ($release.assets.name -notcontains $name) { throw "Asset $name missing from release $tag after upload" }
           }
