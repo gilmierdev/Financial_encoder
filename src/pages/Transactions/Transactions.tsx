@@ -228,7 +228,7 @@ function Transactions(): React.JSX.Element {
               title="Add new transaction (Press N)"
             >
               <Icon name="plus" size={15} />
-              <span>+ Add Transaction</span>
+              <span>Add Transaction</span>
             </button>
           </div>
         }

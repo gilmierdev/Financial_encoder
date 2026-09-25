@@ -224,7 +224,7 @@ function Income(): React.JSX.Element {
             </button>
             <button type="button" className="btn btn--primary" onClick={openAdd}>
               <Icon name="plus" size={15} />
-              <span>+ Add Income</span>
+              <span>Add Income</span>
             </button>
           </div>
         }

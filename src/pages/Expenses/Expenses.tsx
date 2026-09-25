@@ -224,7 +224,7 @@ function Expenses(): React.JSX.Element {
             </button>
             <button type="button" className="btn btn--primary" onClick={openAdd}>
               <Icon name="plus" size={15} />
-              <span>+ Add Expense</span>
+              <span>Add Expense</span>
             </button>
           </div>
         }

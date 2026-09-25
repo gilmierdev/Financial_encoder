@@ -220,7 +220,7 @@ function Capital(): React.JSX.Element {
             </button>
             <button type="button" className="btn btn--primary" onClick={openAdd}>
               <Icon name="plus" size={15} />
-              <span>+ Record Capital</span>
+              <span>Record Capital</span>
             </button>
           </div>
         }
