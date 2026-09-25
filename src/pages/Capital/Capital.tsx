@@ -4,8 +4,11 @@ import EmptyState from '../../components/ui/EmptyState'
 import TypeToConfirmModal from '../../components/ui/TypeToConfirmModal'
 import TransactionForm from '../../components/transactions/TransactionForm'
 import MonthlyAmountChart from '../../components/charts/MonthlyAmountChart'
+import CategoryProgressList from '../../components/ui/CategoryProgressList'
+import { Icon } from '../../components/ui/Icon'
 import { api, ApiError } from '../../services/api'
 import { useSettings } from '../../contexts/SettingsContext'
+import { useToast } from '../../contexts/ToastContext'
 import { formatCurrency } from '../../utils/currency'
 import { formatDate, parseISODate } from '../../utils/dates'
 import {
@@ -32,6 +35,7 @@ const PAGE_SIZE = 20
 
 function Capital(): React.JSX.Element {
   const { settings } = useSettings()
+  const { success, error: toastError } = useToast()
   const currencyCode = settings?.currency ?? 'PHP'
   const dateFormat = settings?.dateFormat ?? 'YYYY-MM-DD'
 
@@ -45,9 +49,9 @@ function Capital(): React.JSX.Element {
   const [pageData, setPageData] = useState<TransactionPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const [page, setPage] = useState(1)
-
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryFilter, setCategoryFilter] = useState('')
 
@@ -125,6 +129,14 @@ function Capital(): React.JSX.Element {
   }, [load])
 
   useEffect(() => {
+    const handleSaved = () => {
+      void load()
+    }
+    window.addEventListener('transaction-saved', handleSaved)
+    return () => window.removeEventListener('transaction-saved', handleSaved)
+  }, [load])
+
+  useEffect(() => {
     setPage(1)
   }, [period, customFrom, customTo, categoryFilter])
 
@@ -145,15 +157,39 @@ function Capital(): React.JSX.Element {
     setDeletingBusy(true)
     try {
       await api.transactions.delete(deleting.id)
+      success(`Capital movement "${deleting.description}" deleted.`)
       setDeleting(null)
       await load()
     } catch (err) {
       const message = (err as ApiError).message ?? 'The transaction could not be deleted.'
       logToMain('error', 'delete capital transaction failed', { message })
+      toastError(message)
       setError(message)
       setDeleting(null)
     } finally {
       setDeletingBusy(false)
+    }
+  }
+
+  const handleExportCsv = async (): Promise<void> => {
+    setExporting(true)
+    try {
+      await api.exports.file({
+        format: 'csv',
+        filter: {
+          types: [...CAPITAL_TYPES],
+          ...(range.date_from ? { date_from: range.date_from } : {}),
+          ...(range.date_to ? { date_to: range.date_to } : {}),
+          ...(categoryFilter ? { category_ids: [Number(categoryFilter)] } : {}),
+        },
+      })
+      success('Capital ledger exported to CSV!')
+    } catch (err) {
+      if ((err as ApiError).message !== 'Export cancelled.') {
+        toastError((err as ApiError).message ?? 'Export failed.')
+      }
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -162,15 +198,31 @@ function Capital(): React.JSX.Element {
     ? `${(pageData.page - 1) * pageData.page_size + (pageData.transactions.length > 0 ? 1 : 0)}–${Math.min(pageData.page * pageData.page_size, pageData.total)} of ${pageData.total}`
     : ''
 
+  const netCapital = totals ? totals.capital - totals.withdrawal : 0
+  const retention = totals && totals.capital > 0 ? ((totals.capital - totals.withdrawal) / totals.capital) * 100 : 0
+
   return (
-    <div className="page">
+    <div className="page capital-page">
       <PageHeader
-        title="Capital"
-        description="Track owner investments, withdrawals and net capital position."
+        title="Capital &amp; Equity"
+        description="Monitor owner investments, contributions, withdrawals and equity reserves."
         actions={
-          <button type="button" className="btn btn--primary" onClick={openAdd}>
-            + Add Transaction
-          </button>
+          <div className="page-header__actions">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={handleExportCsv}
+              disabled={exporting || !totals || totals.count === 0}
+              title="Export capital ledger as CSV"
+            >
+              <Icon name="download" size={15} />
+              <span>{exporting ? 'Exporting…' : 'Export CSV'}</span>
+            </button>
+            <button type="button" className="btn btn--primary" onClick={openAdd}>
+              <Icon name="plus" size={15} />
+              <span>+ Record Capital</span>
+            </button>
+          </div>
         }
       />
 
@@ -202,21 +254,17 @@ function Capital(): React.JSX.Element {
 
         {period === 'custom' && (
           <div className="period-custom">
-            <label className="field__label" htmlFor="capital-from">
-              From
-            </label>
+            <label className="field__label" htmlFor="cap-from">From</label>
             <input
-              id="capital-from"
+              id="cap-from"
               type="date"
               className="text-input text-input--sm"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
             />
-            <label className="field__label" htmlFor="capital-to">
-              To
-            </label>
+            <label className="field__label" htmlFor="cap-to">To</label>
             <input
-              id="capital-to"
+              id="cap-to"
               type="date"
               className="text-input text-input--sm"
               value={customTo}
@@ -236,7 +284,7 @@ function Capital(): React.JSX.Element {
             >
               <option value="">All categories</option>
               {categories.map((c) => (
-                <option key={c.id} value={String(c.id)}>{c.name}</option>
+                <option key={c.id} value={String(c.id)}>{c.name} ({c.type})</option>
               ))}
             </select>
           </label>
@@ -253,189 +301,212 @@ function Capital(): React.JSX.Element {
         <div role="alert" className="notice notice--error">{error}</div>
       ) : null}
 
-      {/* Summary cards */}
+      {/* Modern KPI Cards */}
       {loading && !totals ? (
         <div className="spinner" style={{ margin: '24px auto' }} aria-label="Loading capital" />
       ) : totals ? (
-        <div className="page-summary">
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Total Capital</span>
-            <span className="page-summary__value page-summary__value--positive">
+        <div className="dash-summary">
+          <div className="card stat-card stat-card--capital">
+            <div className="stat-card__head">
+              <span className="stat-card__label">Net Equity Balance</span>
+              <div className="stat-card__icon" aria-hidden="true">
+                <Icon name="capital" size={17} />
+              </div>
+            </div>
+            <span className={`stat-card__value ${netCapital >= 0 ? 'stat-card__value--positive' : 'stat-card__value--negative'}`}>
+              {formatCurrency(netCapital, currencyCode)}
+            </span>
+            <div className="stat-card__footer">
+              <span className="stat-card__badge stat-card__badge--ok">
+                <span>{retention.toFixed(1)}% retained</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="card stat-card">
+            <div className="stat-card__head">
+              <span className="stat-card__label">Capital Added</span>
+              <div className="stat-card__icon" aria-hidden="true">
+                <Icon name="arrowDown" size={17} />
+              </div>
+            </div>
+            <span className="stat-card__value stat-card__value--positive">
               {formatCurrency(totals.capital, currencyCode)}
             </span>
+            <div className="stat-card__footer">
+              <span className="stat-card__subtext">Contributions &amp; injections</span>
+            </div>
           </div>
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Total Withdrawals</span>
-            <span className="page-summary__value page-summary__value--negative">
+
+          <div className="card stat-card">
+            <div className="stat-card__head">
+              <span className="stat-card__label">Total Withdrawn</span>
+              <div className="stat-card__icon" aria-hidden="true">
+                <Icon name="arrowUp" size={17} />
+              </div>
+            </div>
+            <span className="stat-card__value stat-card__value--negative">
               {formatCurrency(totals.withdrawal, currencyCode)}
             </span>
-          </div>
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Net Position</span>
-            <span className={`page-summary__value ${totals.net >= 0 ? 'page-summary__value--positive' : 'page-summary__value--negative'}`}>
-              {formatCurrency(totals.net, currencyCode)}
-            </span>
-          </div>
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Transactions</span>
-            <span className="page-summary__value">
-              {totals.count.toLocaleString()}
-            </span>
+            <div className="stat-card__footer">
+              <span className="stat-card__subtext">Owner disbursements</span>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {/* Monthly trend charts */}
-      {!loading && monthly.length > 0 && (
-        <div className="page-cats">
-          <div className="card">
-            <h3 className="card__title">Capital Trend</h3>
-            <MonthlyAmountChart data={monthly} kind="capital" currencyCode={currencyCode} height={220} />
-          </div>
-          <div className="card">
-            <h3 className="card__title">Withdrawal Trend</h3>
-            <MonthlyAmountChart data={monthly} kind="withdrawal" currencyCode={currencyCode} height={220} />
-          </div>
+      {/* Split: Category Breakdown + Monthly Chart */}
+      <div className="page-split">
+        <div className="card">
+          <h3 className="card__title">Capital Allocations</h3>
+          <CategoryProgressList
+            items={breakdown}
+            currencyCode={currencyCode}
+            emptyMessage="No capital category movements in range."
+            maxItems={8}
+          />
         </div>
-      )}
 
-      {/* Category breakdown + Transaction list */}
-      {!loading && totals && totals.count === 0 && breakdown.length === 0 ? (
-        <EmptyState
-          icon="capital"
-          title="No capital transactions"
-          description={period !== 'all' || categoryFilter ? 'No capital transactions match the selected filters.' : 'Record your first owner investment or withdrawal.'}
-        >
-          {period !== 'all' || categoryFilter ? (
-            <button type="button" className="btn btn--secondary" onClick={() => { setPeriod('all'); setCategoryFilter('') }}>
-              Show all
-            </button>
-          ) : (
-            <button type="button" className="btn btn--primary" onClick={openAdd}>
-              + Add Transaction
-            </button>
+        <div className="card">
+          <h3 className="card__title">Monthly Capital Injections</h3>
+          <MonthlyAmountChart data={monthly} kind="capital" currencyCode={currencyCode} height={260} />
+        </div>
+      </div>
+
+      {/* Transactions Table */}
+      <div className="card">
+        <div className="card__head-flex">
+          <h3 className="card__title">Capital Records</h3>
+          {pageData && pageData.total > 0 && (
+            <span className="field__hint">{counts}</span>
           )}
-        </EmptyState>
-      ) : breakdown.length > 0 || (pageData && pageData.transactions.length > 0) ? (
-        <div className="page-split">
-          {/* Category breakdown */}
-          {breakdown.length > 0 && (
-            <div className="card page-breakdown">
-              <h3 className="card__title">By Category</h3>
-              <table className="ib-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th className="ib-table__right">Total</th>
-                    <th className="ib-table__right">Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {breakdown.map((cat) => (
-                    <tr key={cat.category_id}>
+        </div>
+
+        {loading && !pageData ? (
+          <div className="spinner" style={{ margin: '24px auto' }} aria-label="Loading transactions" />
+        ) : !pageData || pageData.transactions.length === 0 ? (
+          <EmptyState
+            icon="capital"
+            title="No capital records"
+            description="Log equity investments, capital additions, or owner withdrawals."
+          >
+            <button type="button" className="btn btn--primary" onClick={openAdd}>
+              <Icon name="plus" size={15} />
+              <span>+ Record Capital</span>
+            </button>
+          </EmptyState>
+        ) : (
+          <div className="tx-table-wrap">
+            <table className="tx-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th className="tx-table__amount">Amount</th>
+                  <th className="tx-table__actions-head">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageData.transactions.map((tx) => {
+                  const isWithdrawal = tx.type === 'withdrawal'
+                  return (
+                    <tr key={tx.id} className="tx-row">
+                      <td className="tx-cell-date">{formatDate(parseISODate(tx.date), dateFormat)}</td>
+                      <td className="tx-cell-desc">
+                        <span className="tx-table__desc">{tx.description}</span>
+                        {tx.notes ? <span className="tx-table__notes">{tx.notes}</span> : null}
+                      </td>
                       <td>
-                        {cat.category_name}
-                        <span className={`badge badge--${cat.type}`} style={{ marginLeft: 6 }}>
-                          {cat.type}
+                        <span className={`badge badge--${tx.type}`}>{tx.type}</span>
+                      </td>
+                      <td className="tx-cell-cat">
+                        <span className="tx-category-tag">
+                          <span className="tx-category-dot" aria-hidden="true" />
+                          <span>{tx.category_name}</span>
                         </span>
                       </td>
-                      <td className="ib-table__right">{formatCurrency(cat.total, currencyCode)}</td>
-                      <td className="ib-table__right">{cat.count}</td>
+                      <td className={`tx-table__amount ${isWithdrawal ? 'cf-negative' : 'cf-positive'}`}>
+                        <span className="tx-amount-badge">
+                          {isWithdrawal ? '-' : '+'}{formatCurrency(tx.amount, currencyCode)}
+                        </span>
+                      </td>
+                      <td className="tx-table__actions">
+                        <button
+                          type="button"
+                          className="btn btn--secondary btn--sm tx-action-btn"
+                          onClick={() => openEdit(tx)}
+                          title="Edit capital"
+                        >
+                          <Icon name="edit" size={13} />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--danger btn--sm tx-action-btn"
+                          onClick={() => setDeleting(tx)}
+                          title="Delete capital"
+                        >
+                          <Icon name="trash" size={13} />
+                          <span>Delete</span>
+                        </button>
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  )
+                })}
+              </tbody>
+            </table>
 
-          {/* Transaction table */}
-          {pageData && pageData.transactions.length > 0 && (
-            <div className="card page-transactions">
-              <h3 className="card__title">Transactions</h3>
-              <div className="tx-table-wrap">
-                <table className="tx-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Description</th>
-                      <th>Category</th>
-                      <th>Type</th>
-                      <th className="tx-table__amount">Amount</th>
-                      <th className="tx-table__actions-head">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageData.transactions.map((tx) => (
-                      <tr key={tx.id}>
-                        <td>{formatDate(parseISODate(tx.date), dateFormat)}</td>
-                        <td>
-                          <span className="tx-table__desc">{tx.description}</span>
-                          {tx.notes ? <span className="tx-table__notes">{tx.notes}</span> : null}
-                        </td>
-                        <td>{tx.category_name}</td>
-                        <td><span className={`badge badge--${tx.type}`}>{tx.type}</span></td>
-                        <td className="tx-table__amount">{formatCurrency(tx.amount, currencyCode)}</td>
-                        <td className="tx-table__actions">
-                          <button type="button" className="btn btn--secondary btn--sm" onClick={() => openEdit(tx)}>
-                            Edit
-                          </button>
-                          <button type="button" className="btn btn--danger btn--sm" onClick={() => setDeleting(tx)}>
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="tx-pagination">
+              <span className="field__hint">{counts}</span>
+              <div className="tx-pagination__controls">
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ‹ Prev
+                </button>
+                <span className="tx-pagination__page-num">
+                  Page {pageData.page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next ›
+                </button>
               </div>
-
-              {pageData.total_pages > 1 && (
-                <div className="tx-pagination">
-                  <span className="field__hint">{counts}</span>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    disabled={page <= 1 || loading}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    ‹ Prev
-                  </button>
-                  <span className="field__hint">Page {pageData.page} of {totalPages}</span>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    disabled={page >= totalPages || loading}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next ›
-                  </button>
-                </div>
-              )}
             </div>
-          )}
-        </div>
-      ) : null}
+          </div>
+        )}
+      </div>
 
       <TransactionForm
         open={formOpen}
-        transaction={editing}
         defaultType="capital"
+        transaction={editing}
         onClose={() => { setFormOpen(false); setEditing(null) }}
-        onSaved={() => {
+        onSaved={(saved) => {
           setFormOpen(false)
           setEditing(null)
           setError(null)
+          success(editing ? `Updated "${saved.description}"` : `Added "${saved.description}"`)
           void load()
         }}
       />
 
       <TypeToConfirmModal
         open={deleting !== null}
-        title="Delete Transaction"
+        title="Delete Capital Record"
         message={
           <>
             You are about to permanently delete
-            {deleting ? <> <strong>"{deleting.description}"</strong> ({formatCurrency(deleting.amount, currencyCode)})</> : ' the transaction'}
+            {deleting ? <> <strong>"{deleting.description}"</strong> ({formatCurrency(deleting.amount, currencyCode)})</> : ' this capital record'}
             .
           </>
         }

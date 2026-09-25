@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { SettingsProvider } from './contexts/SettingsContext'
+import { ToastProvider } from './contexts/ToastContext'
 import { api, ApiError } from './services/api'
 import { installGlobalErrorForwarding, logToMain } from './services/logger'
 import AppShell from './components/layout/AppShell'
@@ -91,34 +92,36 @@ function BootstrapGate({ children }: { children: ReactNode }): React.JSX.Element
 function App(): React.JSX.Element {
   return (
     <SettingsProvider>
-      <HashRouter>
-        <BootstrapGate>
-          <Suspense fallback={<div className="spinner" style={{ margin: '40px auto' }} aria-label="Loading page" />}>
-            <Routes>
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/transactions" element={<Transactions />} />
-                <Route path="/income" element={<Income />} />
-                <Route path="/expenses" element={<Expenses />} />
-                <Route path="/capital" element={<Capital />} />
-                <Route path="/cash-flow" element={<CashFlow />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/import" element={<Import />} />
-                <Route path="/documents" element={<Documents />} />
-                <Route path="/settings" element={<Navigate to={DEFAULT_SETTINGS_PATH} replace />} />
-                <Route path="/settings/general" element={<SettingsGeneral />} />
-                <Route path="/settings/appearance" element={<SettingsAppearance />} />
-                <Route path="/settings/updates" element={<SettingsUpdates />} />
-                <Route path="/settings/backups" element={<SettingsBackups />} />
-                <Route path="/settings/about" element={<SettingsAbout />} />
-                <Route path="/settings/danger" element={<SettingsDanger />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Route>
-            </Routes>
-          </Suspense>
-        </BootstrapGate>
-      </HashRouter>
+      <ToastProvider>
+        <HashRouter>
+          <BootstrapGate>
+            <Suspense fallback={<div className="spinner" style={{ margin: '40px auto' }} aria-label="Loading page" />}>
+              <Routes>
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/income" element={<Income />} />
+                  <Route path="/expenses" element={<Expenses />} />
+                  <Route path="/capital" element={<Capital />} />
+                  <Route path="/cash-flow" element={<CashFlow />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/import" element={<Import />} />
+                  <Route path="/documents" element={<Documents />} />
+                  <Route path="/settings" element={<Navigate to={DEFAULT_SETTINGS_PATH} replace />} />
+                  <Route path="/settings/general" element={<SettingsGeneral />} />
+                  <Route path="/settings/appearance" element={<SettingsAppearance />} />
+                  <Route path="/settings/updates" element={<SettingsUpdates />} />
+                  <Route path="/settings/backups" element={<SettingsBackups />} />
+                  <Route path="/settings/about" element={<SettingsAbout />} />
+                  <Route path="/settings/danger" element={<SettingsDanger />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </BootstrapGate>
+        </HashRouter>
+      </ToastProvider>
     </SettingsProvider>
   )
 }

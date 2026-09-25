@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../../components/ui/PageHeader'
 import EmptyState from '../../components/ui/EmptyState'
 import CashFlowChart from '../../components/charts/CashFlowChart'
+import CategoryProgressList from '../../components/ui/CategoryProgressList'
+import { Icon } from '../../components/ui/Icon'
 import { api, ApiError } from '../../services/api'
 import { useSettings } from '../../contexts/SettingsContext'
+import { useToast } from '../../contexts/ToastContext'
 import { formatCurrency } from '../../utils/currency'
 import {
   customRangeInvalid,
@@ -24,6 +27,7 @@ import type {
 
 function Reports(): React.JSX.Element {
   const { settings } = useSettings()
+  const { success, error: toastError } = useToast()
   const currencyCode = settings?.currency ?? 'PHP'
 
   const [period, setPeriod] = useState<PeriodKey>('all')
@@ -97,40 +101,66 @@ function Reports(): React.JSX.Element {
     setError(null)
     try {
       await api.exports.file({ format, filter: { ...range } })
+      success(`Report exported successfully as ${format.toUpperCase()}!`)
       logToMain('info', 'report export requested', { format })
     } catch (err) {
       if ((err as ApiError).message !== 'Export cancelled.') {
-        setError((err as ApiError).message ?? 'The report could not be exported.')
+        const msg = (err as ApiError).message ?? 'The report could not be exported.'
+        setError(msg)
+        toastError(msg)
       }
     } finally {
       setExporting(null)
     }
   }
 
+  // Executive summary metrics
+  const netIncome = totals ? totals.income - totals.expense : 0
+  const savingsRate = totals && totals.income > 0 ? (netIncome / totals.income) * 100 : 0
+  const expenseCategories = useMemo(() => breakdown.filter((b) => b.type === 'expense'), [breakdown])
+  const incomeCategories = useMemo(() => breakdown.filter((b) => b.type === 'income'), [breakdown])
+
   return (
     <div className="page report-page">
       <PageHeader
-        title="Reports"
-        description="Income statement, cash flow and category summaries."
+        title="Financial Reports"
+        description="Comprehensive income statements, cash flow analytics, and formal balance summaries."
         actions={
-          <>
+          <div className="page-header__actions">
             {exporting === null && (
-              <button type="button" className="btn btn--secondary" onClick={() => window.print()}>
-                Print
+              <button type="button" className="btn btn--secondary" onClick={() => window.print()} title="Print formal report">
+                <Icon name="printer" size={15} />
+                <span>Print</span>
               </button>
             )}
-            {(['csv', 'xlsx', 'pdf'] as const).map((format) => (
-              <button
-                key={format}
-                type="button"
-                className="btn btn--secondary"
-                onClick={() => exportReport(format)}
-                disabled={exporting !== null}
-              >
-                {exporting === format ? 'Exporting…' : `Export ${format.toUpperCase()}`}
-              </button>
-            ))}
-          </>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => exportReport('csv')}
+              disabled={exporting !== null || !hasData}
+            >
+              <Icon name="download" size={15} />
+              <span>{exporting === 'csv' ? 'Exporting…' : 'CSV'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => exportReport('xlsx')}
+              disabled={exporting !== null || !hasData}
+            >
+              <Icon name="fileSpreadsheet" size={15} />
+              <span>{exporting === 'xlsx' ? 'Exporting…' : 'Excel (.xlsx)'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => exportReport('pdf')}
+              disabled={exporting !== null || !hasData}
+            >
+              <Icon name="reports" size={15} />
+              <span>{exporting === 'pdf' ? 'Generating PDF…' : 'Export PDF'}</span>
+            </button>
+          </div>
         }
       />
 
@@ -179,6 +209,10 @@ function Reports(): React.JSX.Element {
             />
           </div>
         )}
+
+        <div className="dash-period-meta">
+          <span className="dash-range-pill">{periodLabel}</span>
+        </div>
       </div>
 
       {customInvalid ? (
@@ -201,12 +235,63 @@ function Reports(): React.JSX.Element {
         >
           {period !== 'all' && (
             <button type="button" className="btn btn--secondary" onClick={() => setPeriod('all')}>
-              Show all
+              Show all time
             </button>
           )}
         </EmptyState>
       ) : totals ? (
         <>
+          {/* Executive Overview KPI Strip */}
+          <div className="dash-summary">
+            <div className="card stat-card stat-card--income">
+              <div className="stat-card__head">
+                <span className="stat-card__label">Operating Revenue</span>
+                <div className="stat-card__icon"><Icon name="arrowDown" size={17} /></div>
+              </div>
+              <span className="stat-card__value stat-card__value--positive">{formatCurrency(totals.income, currencyCode)}</span>
+              <div className="stat-card__footer">
+                <span className="stat-card__subtext">Gross revenue inflows</span>
+              </div>
+            </div>
+
+            <div className="card stat-card stat-card--expense">
+              <div className="stat-card__head">
+                <span className="stat-card__label">Operating Expenses</span>
+                <div className="stat-card__icon"><Icon name="arrowUp" size={17} /></div>
+              </div>
+              <span className="stat-card__value stat-card__value--negative">{formatCurrency(totals.expense, currencyCode)}</span>
+              <div className="stat-card__footer">
+                <span className="stat-card__subtext">Total operational burn</span>
+              </div>
+            </div>
+
+            <div className="card stat-card stat-card--net">
+              <div className="stat-card__head">
+                <span className="stat-card__label">Net Operating Margin</span>
+                <div className="stat-card__icon"><Icon name="wallet" size={17} /></div>
+              </div>
+              <span className={`stat-card__value ${netIncome >= 0 ? 'stat-card__value--positive' : 'stat-card__value--negative'}`}>
+                {formatCurrency(netIncome, currencyCode)}
+              </span>
+              <div className="stat-card__footer">
+                <span className={`stat-card__badge ${netIncome >= 0 ? 'stat-card__badge--ok' : 'stat-card__badge--danger'}`}>
+                  <span>{savingsRate.toFixed(1)}% margin rate</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="card stat-card stat-card--capital">
+              <div className="stat-card__head">
+                <span className="stat-card__label">Total Transactions</span>
+                <div className="stat-card__icon"><Icon name="transactions" size={17} /></div>
+              </div>
+              <span className="stat-card__value">{totals.count.toLocaleString()}</span>
+              <div className="stat-card__footer">
+                <span className="stat-card__subtext">Records in period</span>
+              </div>
+            </div>
+          </div>
+
           <div className="report-grid">
             {/* Income statement */}
             <div className="card report-block">
@@ -215,15 +300,15 @@ function Reports(): React.JSX.Element {
               <table className="ib-table">
                 <tbody>
                   <tr>
-                    <td>Income</td>
-                    <td className="ib-table__right">{formatCurrency(totals.income, currencyCode)}</td>
+                    <td>Operating Income</td>
+                    <td className="ib-table__right cf-positive">+{formatCurrency(totals.income, currencyCode)}</td>
                   </tr>
                   <tr>
-                    <td>Expenses</td>
-                    <td className="ib-table__right">({formatCurrency(totals.expense, currencyCode)})</td>
+                    <td>Operating Expenses</td>
+                    <td className="ib-table__right cf-negative">({formatCurrency(totals.expense, currencyCode)})</td>
                   </tr>
                   <tr className="ib-table__total">
-                    <td><strong>Net Income</strong></td>
+                    <td><strong>Net Profit / (Loss)</strong></td>
                     <td className={`ib-table__right ${totals.net >= 0 ? 'cf-positive' : 'cf-negative'}`}>
                       <strong>{formatCurrency(totals.net, currencyCode)}</strong>
                     </td>
@@ -234,20 +319,20 @@ function Reports(): React.JSX.Element {
 
             {/* Cash flow */}
             <div className="card report-block">
-              <h3 className="card__title">Cash Flow</h3>
+              <h3 className="card__title">Cash Flow Position</h3>
               <p className="report-period">{periodLabel}</p>
               <table className="ib-table">
                 <tbody>
                   <tr>
-                    <td>Inflows</td>
-                    <td className="ib-table__right">{formatCurrency(totals.income + totals.capital, currencyCode)}</td>
+                    <td>Total Inflows (Inc + Cap)</td>
+                    <td className="ib-table__right cf-positive">+{formatCurrency(totals.income + totals.capital, currencyCode)}</td>
                   </tr>
                   <tr>
-                    <td>Outflows</td>
-                    <td className="ib-table__right">({formatCurrency(totals.expense + totals.withdrawal, currencyCode)})</td>
+                    <td>Total Outflows (Exp + Wdr)</td>
+                    <td className="ib-table__right cf-negative">({formatCurrency(totals.expense + totals.withdrawal, currencyCode)})</td>
                   </tr>
                   <tr className="ib-table__total">
-                    <td><strong>Net Cash Flow</strong></td>
+                    <td><strong>Net Cash Balance Movement</strong></td>
                     <td className={`ib-table__right ${(totals.income + totals.capital - totals.expense - totals.withdrawal) >= 0 ? 'cf-positive' : 'cf-negative'}`}>
                       <strong>{formatCurrency(totals.income + totals.capital - totals.expense - totals.withdrawal, currencyCode)}</strong>
                     </td>
@@ -258,20 +343,20 @@ function Reports(): React.JSX.Element {
 
             {/* Capital */}
             <div className="card report-block">
-              <h3 className="card__title">Capital</h3>
+              <h3 className="card__title">Capital &amp; Equity</h3>
               <p className="report-period">{periodLabel}</p>
               <table className="ib-table">
                 <tbody>
                   <tr>
-                    <td>Capital Added</td>
-                    <td className="ib-table__right">{formatCurrency(totals.capital, currencyCode)}</td>
+                    <td>Capital Contributed</td>
+                    <td className="ib-table__right cf-positive">+{formatCurrency(totals.capital, currencyCode)}</td>
                   </tr>
                   <tr>
-                    <td>Withdrawals</td>
-                    <td className="ib-table__right">({formatCurrency(totals.withdrawal, currencyCode)})</td>
+                    <td>Owner Withdrawals</td>
+                    <td className="ib-table__right cf-negative">({formatCurrency(totals.withdrawal, currencyCode)})</td>
                   </tr>
                   <tr className="ib-table__total">
-                    <td><strong>Net Capital</strong></td>
+                    <td><strong>Net Capital Position</strong></td>
                     <td className={`ib-table__right ${(totals.capital - totals.withdrawal) >= 0 ? 'cf-positive' : 'cf-negative'}`}>
                       <strong>{formatCurrency(totals.capital - totals.withdrawal, currencyCode)}</strong>
                     </td>
@@ -281,38 +366,61 @@ function Reports(): React.JSX.Element {
             </div>
           </div>
 
+          {/* Visual Category Distribution */}
+          <div className="dash-cats">
+            <div className="card">
+              <h3 className="card__title">Expense Distribution</h3>
+              <CategoryProgressList
+                items={expenseCategories}
+                currencyCode={currencyCode}
+                emptyMessage="No expenses in this report period."
+                maxItems={6}
+              />
+            </div>
+
+            <div className="card">
+              <h3 className="card__title">Revenue Distribution</h3>
+              <CategoryProgressList
+                items={incomeCategories}
+                currencyCode={currencyCode}
+                emptyMessage="No income in this report period."
+                maxItems={6}
+              />
+            </div>
+          </div>
+
           {/* Monthly cash flow chart */}
           {monthly.length > 0 && (
             <div className="card page-cf">
-              <h3 className="card__title">Cash Flow Over Time</h3>
+              <h3 className="card__title">Cash Flow Timeline</h3>
               <CashFlowChart
-              data={chartData}
-              currencyCode={currencyCode}
-              height={280}
-              labels={{ inflow: 'Inflows', outflow: 'Outflows', net: 'Net Cash Flow' }}
-            />
+                data={chartData}
+                currencyCode={currencyCode}
+                height={260}
+                labels={{ inflow: 'Inflows', outflow: 'Outflows', net: 'Net Cash Flow' }}
+              />
             </div>
           )}
 
-          {/* Category breakdown */}
+          {/* Category breakdown table */}
           {breakdown.length > 0 && (
             <div className="card">
-              <h3 className="card__title">Category Breakdown</h3>
+              <h3 className="card__title">Full Category Breakdown</h3>
               <div className="tx-table-wrap">
                 <table className="tx-table">
                   <thead>
                     <tr>
                       <th>Category</th>
                       <th>Type</th>
-                      <th className="tx-table__amount">Count</th>
-                      <th className="tx-table__amount">Total</th>
+                      <th className="tx-table__amount">Transactions</th>
+                      <th className="tx-table__amount">Total Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(['income', 'expense', 'capital', 'withdrawal', 'asset', 'liability'] as const).map((type) =>
                       (breakdownByType[type] ?? []).map((cat) => (
-                        <tr key={cat.category_id}>
-                          <td>{cat.category_name}</td>
+                        <tr key={cat.category_id} className="tx-row">
+                          <td style={{ fontWeight: 600 }}>{cat.category_name}</td>
                           <td><span className={`badge badge--${type}`}>{type}</span></td>
                           <td className="tx-table__amount">{cat.count}</td>
                           <td className="tx-table__amount">{formatCurrency(cat.total, currencyCode)}</td>
@@ -328,7 +436,7 @@ function Reports(): React.JSX.Element {
           {/* Monthly summary */}
           {monthly.length > 0 && (
             <div className="card">
-              <h3 className="card__title">Monthly Summary</h3>
+              <h3 className="card__title">Monthly Ledger Summary</h3>
               <div className="tx-table-wrap">
                 <table className="tx-table">
                   <thead>
@@ -338,20 +446,22 @@ function Reports(): React.JSX.Element {
                       <th className="tx-table__amount">Expenses</th>
                       <th className="tx-table__amount">Capital</th>
                       <th className="tx-table__amount">Withdrawals</th>
-                      <th className="tx-table__amount">Net</th>
-                      <th className="tx-table__amount">Count</th>
+                      <th className="tx-table__amount">Net Flow</th>
+                      <th className="tx-table__amount">Tx Count</th>
                     </tr>
                   </thead>
                   <tbody>
                     {monthly.map((row) => (
-                      <tr key={row.month}>
-                        <td>{formatMonth(row.month)}</td>
-                        <td className="tx-table__amount">{formatCurrency(row.income, currencyCode)}</td>
-                        <td className="tx-table__amount">{formatCurrency(row.expense, currencyCode)}</td>
+                      <tr key={row.month} className="tx-row">
+                        <td style={{ fontWeight: 600 }}>{formatMonth(row.month)}</td>
+                        <td className="tx-table__amount cf-positive">{formatCurrency(row.income, currencyCode)}</td>
+                        <td className="tx-table__amount cf-negative">{formatCurrency(row.expense, currencyCode)}</td>
                         <td className="tx-table__amount">{formatCurrency(row.capital, currencyCode)}</td>
                         <td className="tx-table__amount">{formatCurrency(row.withdrawal, currencyCode)}</td>
                         <td className={`tx-table__amount ${row.net >= 0 ? 'cf-positive' : 'cf-negative'}`}>
-                          {formatCurrency(row.net, currencyCode)}
+                          <span className="tx-amount-badge">
+                            {row.net >= 0 ? '+' : ''}{formatCurrency(row.net, currencyCode)}
+                          </span>
                         </td>
                         <td className="tx-table__amount">{row.count}</td>
                       </tr>

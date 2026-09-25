@@ -1,5 +1,17 @@
 # Financial Encoder — Release Notes
 
+## v1.0.12 (September 25, 2026) — Improve UI/UX
+
+### UI & UX Transformation
+
+- **Interactive floating toast alerts.** Immediate, tactile notifications for adding, editing, and deleting records, scanning documents, and exporting reports.
+- **TopBar quick controls & Theme toggle.** Instant 1-click Light/Dark mode switcher, quick `+ New` transaction action, clearable search with keyboard shortcuts.
+- **Power keyboard shortcuts.** Quick transaction entry (`N`), search (`/`), shortcuts cheat sheet (`?`), and rapid chord navigation (`G` then `D`/`T`/`I`/`E`/`C`/`F`/`R`/`M`/`O`/`S`).
+- **Dashboard elevation.** Quick actions strip, modern KPI stat cards with savings rate % and expense-to-income ratio, and visual category progress meters with proportional colored bars.
+- **Enhanced ledgers & transactions.** Quick filter tabs, color-coded amount badges, category indicators, and direct CSV export across all ledger views.
+- **Drag-and-drop dropzones & Steppers.** Drag-and-drop file ingestion for OCR receipts/invoices and CSV/Excel imports with 3-step visual guide.
+- **Executive reports.** High-level financial metrics, multi-format export buttons (PDF, XLSX, CSV, Print), and full printing optimization.
+
 ## v1.0.11 (September 18, 2026)
 
 ### Dashboard

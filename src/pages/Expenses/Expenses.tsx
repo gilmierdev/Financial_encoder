@@ -4,8 +4,11 @@ import EmptyState from '../../components/ui/EmptyState'
 import TypeToConfirmModal from '../../components/ui/TypeToConfirmModal'
 import TransactionForm from '../../components/transactions/TransactionForm'
 import MonthlyAmountChart from '../../components/charts/MonthlyAmountChart'
+import CategoryProgressList from '../../components/ui/CategoryProgressList'
+import { Icon } from '../../components/ui/Icon'
 import { api, ApiError } from '../../services/api'
 import { useSettings } from '../../contexts/SettingsContext'
+import { useToast } from '../../contexts/ToastContext'
 import { formatCurrency } from '../../utils/currency'
 import { formatDate, parseISODate } from '../../utils/dates'
 import {
@@ -31,6 +34,7 @@ const PAGE_SIZE = 20
 
 function Expenses(): React.JSX.Element {
   const { settings } = useSettings()
+  const { success, error: toastError } = useToast()
   const currencyCode = settings?.currency ?? 'PHP'
   const dateFormat = settings?.dateFormat ?? 'YYYY-MM-DD'
 
@@ -44,9 +48,9 @@ function Expenses(): React.JSX.Element {
   const [pageData, setPageData] = useState<TransactionPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const [page, setPage] = useState(1)
-
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryFilter, setCategoryFilter] = useState('')
 
@@ -120,6 +124,14 @@ function Expenses(): React.JSX.Element {
   }, [load])
 
   useEffect(() => {
+    const handleSaved = () => {
+      void load()
+    }
+    window.addEventListener('transaction-saved', handleSaved)
+    return () => window.removeEventListener('transaction-saved', handleSaved)
+  }, [load])
+
+  useEffect(() => {
     setPage(1)
   }, [period, customFrom, customTo, categoryFilter])
 
@@ -140,15 +152,39 @@ function Expenses(): React.JSX.Element {
     setDeletingBusy(true)
     try {
       await api.transactions.delete(deleting.id)
+      success(`Expense "${deleting.description}" deleted.`)
       setDeleting(null)
       await load()
     } catch (err) {
       const message = (err as ApiError).message ?? 'The expense transaction could not be deleted.'
-      logToMain('error', 'delete expense transaction failed', { message })
+      logToMain('error', 'delete expense failed', { message })
+      toastError(message)
       setError(message)
       setDeleting(null)
     } finally {
       setDeletingBusy(false)
+    }
+  }
+
+  const handleExportCsv = async (): Promise<void> => {
+    setExporting(true)
+    try {
+      await api.exports.file({
+        format: 'csv',
+        filter: {
+          types: ['expense'],
+          ...(range.date_from ? { date_from: range.date_from } : {}),
+          ...(range.date_to ? { date_to: range.date_to } : {}),
+          ...(categoryFilter ? { category_ids: [Number(categoryFilter)] } : {}),
+        },
+      })
+      success('Expense ledger exported to CSV!')
+    } catch (err) {
+      if ((err as ApiError).message !== 'Export cancelled.') {
+        toastError((err as ApiError).message ?? 'Export failed.')
+      }
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -157,15 +193,40 @@ function Expenses(): React.JSX.Element {
     ? `${(pageData.page - 1) * pageData.page_size + (pageData.transactions.length > 0 ? 1 : 0)}–${Math.min(pageData.page * pageData.page_size, pageData.total)} of ${pageData.total}`
     : ''
 
+  const monthlyAverage = useMemo(() => {
+    const activeMonths = monthly.filter((m) => m.expense > 0)
+    if (activeMonths.length === 0) return 0
+    const sum = activeMonths.reduce((acc, m) => acc + m.expense, 0)
+    return sum / activeMonths.length
+  }, [monthly])
+
+  const topCategory = useMemo(() => {
+    if (breakdown.length === 0) return null
+    return [...breakdown].sort((a, b) => b.total - a.total)[0]
+  }, [breakdown])
+
   return (
-    <div className="page">
+    <div className="page expenses-page">
       <PageHeader
         title="Expenses"
-        description="View and manage all expense transactions."
+        description="Monitor spending outflows, operational costs, and category allocations."
         actions={
-          <button type="button" className="btn btn--primary" onClick={openAdd}>
-            + Add Expense
-          </button>
+          <div className="page-header__actions">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={handleExportCsv}
+              disabled={exporting || !totals || totals.expense === 0}
+              title="Export expenses as CSV"
+            >
+              <Icon name="download" size={15} />
+              <span>{exporting ? 'Exporting…' : 'Export CSV'}</span>
+            </button>
+            <button type="button" className="btn btn--primary" onClick={openAdd}>
+              <Icon name="plus" size={15} />
+              <span>+ Add Expense</span>
+            </button>
+          </div>
         }
       />
 
@@ -197,9 +258,7 @@ function Expenses(): React.JSX.Element {
 
         {period === 'custom' && (
           <div className="period-custom">
-            <label className="field__label" htmlFor="expense-from">
-              From
-            </label>
+            <label className="field__label" htmlFor="expense-from">From</label>
             <input
               id="expense-from"
               type="date"
@@ -207,9 +266,7 @@ function Expenses(): React.JSX.Element {
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
             />
-            <label className="field__label" htmlFor="expense-to">
-              To
-            </label>
+            <label className="field__label" htmlFor="expense-to">To</label>
             <input
               id="expense-to"
               type="date"
@@ -248,177 +305,209 @@ function Expenses(): React.JSX.Element {
         <div role="alert" className="notice notice--error">{error}</div>
       ) : null}
 
-      {/* Summary cards */}
+      {/* KPI Stat Cards */}
       {loading && !totals ? (
         <div className="spinner" style={{ margin: '24px auto' }} aria-label="Loading expenses" />
       ) : totals ? (
-        <div className="page-summary">
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Total Expenses</span>
-            <span className="page-summary__value page-summary__value--negative">
+        <div className="dash-summary">
+          <div className="card stat-card stat-card--expense">
+            <div className="stat-card__head">
+              <span className="stat-card__label">Total Expenses</span>
+              <div className="stat-card__icon" aria-hidden="true">
+                <Icon name="arrowUp" size={17} />
+              </div>
+            </div>
+            <span className="stat-card__value stat-card__value--negative">
               {formatCurrency(totals.expense, currencyCode)}
             </span>
-          </div>
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Transactions</span>
-            <span className="page-summary__value">
-              {totals.count.toLocaleString()}
-            </span>
-          </div>
-          <div className="card page-summary__card">
-            <span className="page-summary__label">Categories Used</span>
-            <span className="page-summary__value">
-              {breakdown.length}
-            </span>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Monthly trend chart */}
-      {!loading && monthly.length > 0 && (
-        <div className="card">
-          <h3 className="card__title">Monthly Trend</h3>
-          <MonthlyAmountChart data={monthly} kind="expense" currencyCode={currencyCode} height={240} />
-        </div>
-      )}
-
-      {/* Category breakdown + Transaction list */}
-      {!loading && totals && totals.count === 0 && breakdown.length === 0 ? (
-        <EmptyState
-          icon="expenses"
-          title="No expenses recorded"
-          description={period !== 'all' || categoryFilter ? 'No expenses match the selected filters.' : 'Start by recording your first expense.'}
-        >
-          {period !== 'all' || categoryFilter ? (
-            <button type="button" className="btn btn--secondary" onClick={() => { setPeriod('all'); setCategoryFilter('') }}>
-              Show all
-            </button>
-          ) : (
-            <button type="button" className="btn btn--primary" onClick={openAdd}>
-              + Add Expense
-            </button>
-          )}
-        </EmptyState>
-      ) : breakdown.length > 0 || (pageData && pageData.transactions.length > 0) ? (
-        <div className="page-split">
-          {/* Category breakdown */}
-          {breakdown.length > 0 && (
-            <div className="card page-breakdown">
-              <h3 className="card__title">Expenses by Category</h3>
-              <table className="ib-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th className="ib-table__right">Total</th>
-                    <th className="ib-table__right">Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {breakdown.map((cat) => (
-                    <tr key={cat.category_id}>
-                      <td>{cat.category_name}</td>
-                      <td className="ib-table__right">{formatCurrency(cat.total, currencyCode)}</td>
-                      <td className="ib-table__right">{cat.count}</td>
-                    </tr>
-                  ))}
-                  {totals && (
-                    <tr className="ib-table__total">
-                      <td><strong>Total</strong></td>
-                      <td className="ib-table__right"><strong>{formatCurrency(totals.expense, currencyCode)}</strong></td>
-                      <td className="ib-table__right"><strong>{totals.count}</strong></td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="stat-card__footer">
+              <span className="stat-card__subtext">Across {totals.count} transactions</span>
             </div>
-          )}
+          </div>
 
-          {/* Transaction table */}
-          {pageData && pageData.transactions.length > 0 && (
-            <div className="card page-transactions">
-              <h3 className="card__title">Expense Transactions</h3>
-              <div className="tx-table-wrap">
-                <table className="tx-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Description</th>
-                      <th>Category</th>
-                      <th className="tx-table__amount">Amount</th>
-                      <th className="tx-table__actions-head">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageData.transactions.map((tx) => (
-                      <tr key={tx.id}>
-                        <td>{formatDate(parseISODate(tx.date), dateFormat)}</td>
-                        <td>
-                          <span className="tx-table__desc">{tx.description}</span>
-                          {tx.notes ? <span className="tx-table__notes">{tx.notes}</span> : null}
-                        </td>
-                        <td>{tx.category_name}</td>
-                        <td className="tx-table__amount">{formatCurrency(tx.amount, currencyCode)}</td>
-                        <td className="tx-table__actions">
-                          <button type="button" className="btn btn--secondary btn--sm" onClick={() => openEdit(tx)}>
-                            Edit
-                          </button>
-                          <button type="button" className="btn btn--danger btn--sm" onClick={() => setDeleting(tx)}>
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="card stat-card">
+            <div className="stat-card__head">
+              <span className="stat-card__label">Monthly Average</span>
+              <div className="stat-card__icon" aria-hidden="true">
+                <Icon name="calendar" size={17} />
               </div>
+            </div>
+            <span className="stat-card__value">
+              {formatCurrency(monthlyAverage, currencyCode)}
+            </span>
+            <div className="stat-card__footer">
+              <span className="stat-card__subtext">Mean burn per month</span>
+            </div>
+          </div>
 
-              {pageData.total_pages > 1 && (
-                <div className="tx-pagination">
-                  <span className="field__hint">{counts}</span>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    disabled={page <= 1 || loading}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    ‹ Prev
-                  </button>
-                  <span className="field__hint">Page {pageData.page} of {totalPages}</span>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    disabled={page >= totalPages || loading}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next ›
-                  </button>
-                </div>
+          <div className="card stat-card">
+            <div className="stat-card__head">
+              <span className="stat-card__label">Top Expense Stream</span>
+              <div className="stat-card__icon" aria-hidden="true">
+                <Icon name="tag" size={17} />
+              </div>
+            </div>
+            <span className="stat-card__value" style={{ fontSize: '20px' }}>
+              {topCategory ? topCategory.category_name : '—'}
+            </span>
+            <div className="stat-card__footer">
+              {topCategory ? (
+                <span className="stat-card__badge stat-card__badge--warn">
+                  {formatCurrency(topCategory.total, currencyCode)}
+                </span>
+              ) : (
+                <span className="stat-card__subtext">No category data</span>
               )}
             </div>
-          )}
+          </div>
         </div>
       ) : null}
+
+      {/* Split: Category Breakdown + Monthly Chart */}
+      <div className="page-split">
+        <div className="card">
+          <h3 className="card__title">Category Spending Allocation</h3>
+          <CategoryProgressList
+            items={breakdown}
+            currencyCode={currencyCode}
+            emptyMessage="No expense categories in range."
+            maxItems={8}
+          />
+        </div>
+
+        <div className="card">
+          <h3 className="card__title">Monthly Outflow Trend</h3>
+          <MonthlyAmountChart data={monthly} kind="expense" currencyCode={currencyCode} height={260} />
+        </div>
+      </div>
+
+      {/* Transactions Table */}
+      <div className="card">
+        <div className="card__head-flex">
+          <h3 className="card__title">Expense Transactions</h3>
+          {pageData && pageData.total > 0 && (
+            <span className="field__hint">{counts}</span>
+          )}
+        </div>
+
+        {loading && !pageData ? (
+          <div className="spinner" style={{ margin: '24px auto' }} aria-label="Loading transactions" />
+        ) : !pageData || pageData.transactions.length === 0 ? (
+          <EmptyState
+            icon="expenses"
+            title="No expenses logged"
+            description="Keep track of your budget by recording outgoing expenses."
+          >
+            <button type="button" className="btn btn--primary" onClick={openAdd}>
+              <Icon name="plus" size={15} />
+              <span>+ Add Expense</span>
+            </button>
+          </EmptyState>
+        ) : (
+          <div className="tx-table-wrap">
+            <table className="tx-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th className="tx-table__amount">Amount</th>
+                  <th className="tx-table__actions-head">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageData.transactions.map((tx) => (
+                  <tr key={tx.id} className="tx-row">
+                    <td className="tx-cell-date">{formatDate(parseISODate(tx.date), dateFormat)}</td>
+                    <td className="tx-cell-desc">
+                      <span className="tx-table__desc">{tx.description}</span>
+                      {tx.notes ? <span className="tx-table__notes">{tx.notes}</span> : null}
+                    </td>
+                    <td className="tx-cell-cat">
+                      <span className="tx-category-tag">
+                        <span className="tx-category-dot" aria-hidden="true" />
+                        <span>{tx.category_name}</span>
+                      </span>
+                    </td>
+                    <td className="tx-table__amount cf-negative">
+                      <span className="tx-amount-badge">
+                        -{formatCurrency(tx.amount, currencyCode)}
+                      </span>
+                    </td>
+                    <td className="tx-table__actions">
+                      <button
+                        type="button"
+                        className="btn btn--secondary btn--sm tx-action-btn"
+                        onClick={() => openEdit(tx)}
+                        title="Edit expense"
+                      >
+                        <Icon name="edit" size={13} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--danger btn--sm tx-action-btn"
+                        onClick={() => setDeleting(tx)}
+                        title="Delete expense"
+                      >
+                        <Icon name="trash" size={13} />
+                        <span>Delete</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="tx-pagination">
+              <span className="field__hint">{counts}</span>
+              <div className="tx-pagination__controls">
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ‹ Prev
+                </button>
+                <span className="tx-pagination__page-num">
+                  Page {pageData.page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next ›
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <TransactionForm
         open={formOpen}
-        transaction={editing}
         defaultType="expense"
+        transaction={editing}
         onClose={() => { setFormOpen(false); setEditing(null) }}
-        onSaved={() => {
+        onSaved={(saved) => {
           setFormOpen(false)
           setEditing(null)
           setError(null)
+          success(editing ? `Updated "${saved.description}"` : `Added "${saved.description}"`)
           void load()
         }}
       />
 
       <TypeToConfirmModal
         open={deleting !== null}
-        title="Delete Expense"
+        title="Delete Expense Transaction"
         message={
           <>
             You are about to permanently delete
-            {deleting ? <> <strong>"{deleting.description}"</strong> ({formatCurrency(deleting.amount, currencyCode)})</> : ' the expense transaction'}
+            {deleting ? <> <strong>"{deleting.description}"</strong> ({formatCurrency(deleting.amount, currencyCode)})</> : ' this expense record'}
             .
           </>
         }

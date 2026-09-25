@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useSettings } from '../../contexts/SettingsContext'
 import { formatDate } from '../../utils/dates'
 import { Icon } from '../ui/Icon'
 
-function TopBar(): React.JSX.Element {
-  const { settings } = useSettings()
+interface TopBarProps {
+  onOpenAddTransaction?: () => void
+  onOpenShortcuts?: () => void
+}
+
+function TopBar({ onOpenAddTransaction, onOpenShortcuts }: TopBarProps): React.JSX.Element {
+  const { settings, setSetting } = useSettings()
   const navigate = useNavigate()
   const [now, setNow] = useState(() => new Date())
   const [query, setQuery] = useState('')
@@ -17,12 +22,11 @@ function TopBar(): React.JSX.Element {
 
   const dateFormat = settings?.dateFormat ?? 'YYYY-MM-DD'
   const dateLabel = formatDate(now, dateFormat)
+  const isDark = settings?.theme === 'dark'
 
-  const handleSettingsKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>): void => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      navigate('/settings')
-    }
+  const toggleTheme = (): void => {
+    const nextTheme = isDark ? 'light' : 'dark'
+    void setSetting('theme', nextTheme)
   }
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
@@ -35,43 +39,90 @@ function TopBar(): React.JSX.Element {
   return (
     <header className="topbar">
       <div className="topbar__left">
-        <div className="topbar__logo" aria-hidden="true">
-          <Icon name="capital" size={16} />
-        </div>
-        <span className="topbar__app-name">{settings?.appName ?? 'Financial Encoder'}</span>
+        <Link to="/dashboard" className="topbar__brand-link" title="Go to Dashboard">
+          <div className="topbar__logo" aria-hidden="true">
+            <Icon name="capital" size={16} />
+          </div>
+          <span className="topbar__app-name">{settings?.appName ?? 'Financial Encoder'}</span>
+        </Link>
       </div>
 
       <form className="topbar__search" role="search" onSubmit={handleSearchSubmit}>
         <span className="topbar__search-icon" aria-hidden="true">
-          <Icon name="search" size={16} />
+          <Icon name="search" size={15} />
         </span>
         <input
+          id="global-search-input"
           type="search"
           className="topbar__search-input"
-          placeholder="Search transactions…"
+          placeholder="Search transactions… (/)"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label="Search transactions"
           spellCheck={false}
         />
-        <button type="submit" className="sr-only" aria-label="Search">
-          Search
-        </button>
+        {query ? (
+          <button
+            type="button"
+            className="topbar__search-clear"
+            onClick={() => setQuery('')}
+            aria-label="Clear search"
+          >
+            <Icon name="x" size={13} />
+          </button>
+        ) : (
+          <kbd className="topbar__search-kbd" aria-hidden="true">/</kbd>
+        )}
       </form>
 
       <div className="topbar__right">
-        <time className="topbar__date" dateTime={now.toISOString()}>
-          {dateLabel}
+        {onOpenAddTransaction && (
+          <button
+            type="button"
+            className="btn btn--primary btn--sm topbar__add-btn"
+            onClick={onOpenAddTransaction}
+            title="Add transaction (Press N)"
+          >
+            <Icon name="plus" size={14} />
+            <span>New</span>
+          </button>
+        )}
+
+        <time className="topbar__date" dateTime={now.toISOString()} title={now.toLocaleTimeString()}>
+          <Icon name="calendar" size={13} />
+          <span>{dateLabel}</span>
         </time>
+
         <button
           type="button"
-          className="topbar__settings"
+          className="topbar__icon-btn"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+          title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+        >
+          <Icon name={isDark ? 'sun' : 'moon'} size={17} />
+        </button>
+
+        {onOpenShortcuts && (
+          <button
+            type="button"
+            className="topbar__icon-btn"
+            onClick={onOpenShortcuts}
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (Press ?)"
+          >
+            <Icon name="keyboard" size={17} />
+          </button>
+        )}
+
+        <button
+          type="button"
+          className="topbar__icon-btn"
           onClick={() => navigate('/settings')}
-          onKeyDown={handleSettingsKeyDown}
           aria-label="Open settings"
           title="Settings"
         >
-          <Icon name="settings" size={18} />
+          <Icon name="settings" size={17} />
         </button>
       </div>
     </header>
