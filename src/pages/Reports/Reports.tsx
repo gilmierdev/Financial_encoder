@@ -246,7 +246,7 @@ function Reports(): React.JSX.Element {
             <div className="card stat-card stat-card--income">
               <div className="stat-card__head">
                 <span className="stat-card__label">Operating Revenue</span>
-                <div className="stat-card__icon"><Icon name="arrowDown" size={17} /></div>
+                <div className="stat-card__icon"><Icon name="arrowUp" size={17} /></div>
               </div>
               <span className="stat-card__value stat-card__value--positive">{formatCurrency(totals.income, currencyCode)}</span>
               <div className="stat-card__footer">
@@ -257,7 +257,7 @@ function Reports(): React.JSX.Element {
             <div className="card stat-card stat-card--expense">
               <div className="stat-card__head">
                 <span className="stat-card__label">Operating Expenses</span>
-                <div className="stat-card__icon"><Icon name="arrowUp" size={17} /></div>
+                <div className="stat-card__icon"><Icon name="arrowDown" size={17} /></div>
               </div>
               <span className="stat-card__value stat-card__value--negative">{formatCurrency(totals.expense, currencyCode)}</span>
               <div className="stat-card__footer">

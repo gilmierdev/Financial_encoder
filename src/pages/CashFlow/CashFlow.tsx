@@ -201,7 +201,7 @@ function CashFlow(): React.JSX.Element {
             <div className="stat-card__head">
               <span className="stat-card__label">Total Inflows</span>
               <div className="stat-card__icon" aria-hidden="true">
-                <Icon name="arrowDown" size={17} />
+                <Icon name="arrowUp" size={17} />
               </div>
             </div>
             <span className="stat-card__value stat-card__value--positive">
@@ -216,7 +216,7 @@ function CashFlow(): React.JSX.Element {
             <div className="stat-card__head">
               <span className="stat-card__label">Total Outflows</span>
               <div className="stat-card__icon" aria-hidden="true">
-                <Icon name="arrowUp" size={17} />
+                <Icon name="arrowDown" size={17} />
               </div>
             </div>
             <span className="stat-card__value stat-card__value--negative">

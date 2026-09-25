@@ -63,14 +63,14 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   income: (
     <>
-      <path d="M12 5v14" />
-      <path d="m19 12-7 7-7-7" />
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
     </>
   ),
   expenses: (
     <>
       <path d="M12 5v14" />
-      <path d="m5 12 7-7 7 7" />
+      <path d="m19 12-7 7-7-7" />
     </>
   ),
   capital: (

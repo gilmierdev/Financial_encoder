@@ -188,7 +188,7 @@ function Dashboard(): React.JSX.Element {
           title="Quick log income"
         >
           <span className="dash-action-btn__icon">
-            <Icon name="arrowDown" size={16} />
+            <Icon name="arrowUp" size={16} />
           </span>
           <div className="dash-action-btn__text">
             <span className="dash-action-btn__label">+ Log Income</span>
@@ -203,7 +203,7 @@ function Dashboard(): React.JSX.Element {
           title="Quick log expense"
         >
           <span className="dash-action-btn__icon">
-            <Icon name="arrowUp" size={16} />
+            <Icon name="arrowDown" size={16} />
           </span>
           <div className="dash-action-btn__text">
             <span className="dash-action-btn__label">- Log Expense</span>
@@ -315,7 +315,7 @@ function Dashboard(): React.JSX.Element {
               <div className="stat-card__head">
                 <span className="stat-card__label">Total Income</span>
                 <div className="stat-card__icon" aria-hidden="true">
-                  <Icon name="arrowDown" size={17} />
+                  <Icon name="arrowUp" size={17} />
                 </div>
               </div>
               <span className="stat-card__value stat-card__value--positive">
@@ -338,7 +338,7 @@ function Dashboard(): React.JSX.Element {
               <div className="stat-card__head">
                 <span className="stat-card__label">Total Expenses</span>
                 <div className="stat-card__icon" aria-hidden="true">
-                  <Icon name="arrowUp" size={17} />
+                  <Icon name="arrowDown" size={17} />
                 </div>
               </div>
               <span className="stat-card__value stat-card__value--negative">
